@@ -64,6 +64,8 @@ Ouvrez ensuite `http://<ip-du-conteneur>:3000` pour créer le compte administrat
 - **Mise à jour** : `potager-update` (relance le script : `git pull`, compilation, redémarrage). Données et configuration conservées.
 - **Version précise** : `curl … | POTAGER_REF=v1.0 bash` (branche ou étiquette Git ; `main` par défaut).
 - **Configuration** : `/etc/potager.env` (port, `TZ`, `COOKIE_SECURE`…), puis `systemctl restart potager`.
+- **Derrière nginx / nginx Proxy Manager** : désactiver « Cache Assets » (il met en cache les requêtes de navigation de Next.js et provoque
+  « This page couldn't load » après un clic dans le menu) et « Block Common Exploits » ; activer « Websockets Support » si MQTT passe par le même hôte.
 - **Données** : `/var/lib/potager` (base, photos, plan, clé de chiffrement).
 - **Journaux** : `journalctl -u potager -f`.
 - **Sauvegarde** : `bash /opt/potager/deploy/backup.sh [dossier]` (archive datée, à planifier avec cron).
