@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 type Item = { href: string; label: string; icon: string; highlight?: boolean };
 
@@ -37,6 +38,9 @@ function NavLink({ item, active }: { item: Item; active: boolean }) {
 
 export default function Sidebar({ user, logoutAction }: { user: { nom: string; role: string }; logoutAction: () => Promise<void> }) {
   const pathname = usePathname();
+  // Replié par défaut ; déplié d'office quand on est sur une page de paramètres, sauf choix contraire de l'utilisateur.
+  const [manual, setManual] = useState<boolean | null>(null);
+  const settingsOpen = manual ?? pathname.startsWith("/settings");
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href) && !(href === "/plants" && pathname === "/plants/new"));
   return (
     <aside className="flex w-60 shrink-0 flex-col gap-1 border-r border-border bg-card p-3">
@@ -46,12 +50,23 @@ export default function Sidebar({ user, logoutAction }: { user: { nom: string; r
           <NavLink key={i.href} item={i} active={isActive(i.href)} />
         ))}
       </nav>
-      <div className="mt-4 px-3 text-xs font-semibold uppercase tracking-wide text-muted">Paramètres</div>
-      <nav className="flex flex-col gap-1">
-        {SETTINGS.map((i) => (
-          <NavLink key={i.href} item={i} active={isActive(i.href)} />
-        ))}
-      </nav>
+      <button
+        type="button"
+        onClick={() => setManual(!settingsOpen)}
+        aria-expanded={settingsOpen}
+        aria-controls="menu-parametres"
+        className="mt-4 flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted hover:bg-black/5 dark:hover:bg-white/5"
+      >
+        <span>⚙️ Paramètres</span>
+        <span aria-hidden className={`transition-transform ${settingsOpen ? "rotate-90" : ""}`}>›</span>
+      </button>
+      {settingsOpen && (
+        <nav id="menu-parametres" className="flex flex-col gap-1">
+          {SETTINGS.map((i) => (
+            <NavLink key={i.href} item={i} active={isActive(i.href)} />
+          ))}
+        </nav>
+      )}
       <form action={logoutAction} className="mt-auto flex items-center justify-between px-3 pt-4 text-sm">
         <span className="truncate text-muted">{user.nom}</span>
         <button className="text-xs underline">Déconnexion</button>
