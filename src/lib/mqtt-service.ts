@@ -309,6 +309,8 @@ export function startMqtt() {
       if (!d) return;
       for (const p of all<{ id: number }>("SELECT id FROM plant")) publishState(d, p.id).catch(logErr("publication périodique"));
       publishRappels(d);
+      // Réaffirme « online » : si une autre instance (même préfixe) a déclenché le testament « offline », ça se corrige seul.
+      client.publish(statusTopic(d.cfg), "online", { retain: true });
     }, PUBLISH_REFRESH_MS);
     s.publishTimer.unref();
   });

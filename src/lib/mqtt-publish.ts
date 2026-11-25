@@ -22,6 +22,10 @@ const HA_DEVICE_CLASS: Record<MetricKey, string> = {
   lux: "illuminance",
 };
 
+/** Identifiant d'instance dans Home Assistant : dérivé du préfixe, pour que deux instances (dev + prod) sur le même broker ne se marchent pas dessus. */
+export const nodeId = (cfg: MqttSettings, id: number | "hub") =>
+  `${cfg.publishPrefix.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "potager"}_${id}`;
+
 export const statusTopic = (cfg: MqttSettings) => `${cfg.publishPrefix}/status`;
 const base = (cfg: MqttSettings, id: number) => `${cfg.publishPrefix}/plant/${id}`;
 export const stateTopic = (cfg: MqttSettings, id: number) => `${base(cfg, id)}/state`;
@@ -91,9 +95,10 @@ export async function publishState(d: Deps, plantId: number) {
 // ---------- Découverte Home Assistant ----------
 function discoveryConfigs(cfg: MqttSettings, p: PlantRow, metriques: MetricKey[]) {
   const id = p.id;
+  const nid = nodeId(cfg, id);
   const st = stateTopic(cfg, id);
   const device = {
-    identifiers: [`potager_${id}`],
+    identifiers: [nid],
     name: p.variete ? `${p.nom} (${p.variete})` : p.nom,
     manufacturer: "Potager",
     model: p.opb_pid ?? "Plant",
@@ -101,7 +106,7 @@ function discoveryConfigs(cfg: MqttSettings, p: PlantRow, metriques: MetricKey[]
   };
   const common = { availability: [{ topic: statusTopic(cfg) }], device };
   const out: { topic: string; payload: Record<string, unknown> }[] = [];
-  const t = (component: string, object: string) => `${cfg.haDiscoveryPrefix}/${component}/potager_${id}/${object}/config`;
+  const t = (component: string, object: string) => `${cfg.haDiscoveryPrefix}/${component}/${nid}/${object}/config`;
 
   for (const m of metriques) {
     out.push({
@@ -109,7 +114,7 @@ function discoveryConfigs(cfg: MqttSettings, p: PlantRow, metriques: MetricKey[]
       payload: {
         ...common,
         name: METRICS[m].label,
-        unique_id: `potager_${id}_${m}`,
+        unique_id: `${nid}_${m}`,
         state_topic: st,
         value_template: `{{ value_json.mesures.${m}.valeur }}`,
         unit_of_measurement: METRICS[m].unite,
@@ -126,7 +131,7 @@ function discoveryConfigs(cfg: MqttSettings, p: PlantRow, metriques: MetricKey[]
       payload: {
         ...common,
         name: "Alerte",
-        unique_id: `potager_${id}_alerte`,
+        unique_id: `${nid}_alerte`,
         state_topic: st,
         value_template: "{{ 'ON' if value_json.alertes | length > 0 else 'OFF' }}",
         device_class: "problem",
@@ -136,16 +141,16 @@ function discoveryConfigs(cfg: MqttSettings, p: PlantRow, metriques: MetricKey[]
     });
     out.push({
       topic: t("sensor", "etat"),
-      payload: { ...common, name: "État", unique_id: `potager_${id}_etat`, state_topic: st, value_template: "{{ value_json.etat_global }}", icon: "mdi:sprout" },
+      payload: { ...common, name: "État", unique_id: `${nid}_etat`, state_topic: st, value_template: "{{ value_json.etat_global }}", icon: "mdi:sprout" },
     });
   }
   out.push({
     topic: t("sensor", "age"),
-    payload: { ...common, name: "Âge depuis la plantation", unique_id: `potager_${id}_age`, state_topic: st, value_template: "{{ value_json.age_jours }}", unit_of_measurement: "j", icon: "mdi:calendar-clock" },
+    payload: { ...common, name: "Âge depuis la plantation", unique_id: `${nid}_age`, state_topic: st, value_template: "{{ value_json.age_jours }}", unit_of_measurement: "j", icon: "mdi:calendar-clock" },
   });
   out.push({
     topic: t("sensor", "dernier_arrosage"),
-    payload: { ...common, name: "Dernier arrosage", unique_id: `potager_${id}_arrosage`, state_topic: st, value_template: "{{ value_json.dernier_arrosage if value_json.dernier_arrosage else none }}", device_class: "date" },
+    payload: { ...common, name: "Dernier arrosage", unique_id: `${nid}_arrosage`, state_topic: st, value_template: "{{ value_json.dernier_arrosage if value_json.dernier_arrosage else none }}", device_class: "date" },
   });
 
   const wantUrl = cfg.imageMode === "url" || cfg.imageMode === "both";
@@ -155,7 +160,7 @@ function discoveryConfigs(cfg: MqttSettings, p: PlantRow, metriques: MetricKey[]
       payload: {
         ...common,
         name: "Photo",
-        unique_id: `potager_${id}_photo`,
+        unique_id: `${nid}_photo`,
         ...(wantUrl ? { url_topic: imageUrlTopic(cfg, id) } : { image_topic: imageB64Topic(cfg, id), image_encoding: "b64", content_type: "image/jpeg" }),
       },
     });
@@ -187,14 +192,14 @@ export async function syncPlant(d: Deps, plantId: number) {
     );
     const desired = discoveryConfigs(d.cfg, p, metriques);
     const desiredSet = new Set(desired.map((x) => x.topic));
-    const mine = storedTopics().filter((t) => t.includes(`/potager_${plantId}/`));
+    const mine = storedTopics().filter((t) => t.includes(`/${nodeId(d.cfg, plantId)}/`));
     removeTopics(d, mine.filter((t) => !desiredSet.has(t)));
     for (const x of desired) {
       d.publish(x.topic, JSON.stringify(x.payload), true);
       recordTopic(x.topic);
     }
   } else {
-    removeTopics(d, storedTopics().filter((t) => t.includes(`/potager_${plantId}/`)));
+    removeTopics(d, storedTopics().filter((t) => t.includes(`/${nodeId(d.cfg, plantId)}/`)));
   }
 
   // Topics d'image (consommés par l'entité image de HA)
@@ -208,7 +213,7 @@ export async function syncPlant(d: Deps, plantId: number) {
 
 // ---------- Rappels « à faire » (pour les notifications Home Assistant) ----------
 const rappelsTopic = (cfg: MqttSettings) => `${cfg.publishPrefix}/rappels`;
-const rappelsDiscoveryTopic = (cfg: MqttSettings) => `${cfg.haDiscoveryPrefix}/sensor/potager_hub/rappels/config`;
+const rappelsDiscoveryTopic = (cfg: MqttSettings) => `${cfg.haDiscoveryPrefix}/sensor/${nodeId(cfg, "hub")}/rappels/config`;
 
 /**
  * Publie la liste des rappels sur `<préfixe>/rappels` et un capteur HA « Rappels potager »
@@ -223,14 +228,14 @@ export function publishRappels(d: Deps) {
     d.cfg.haDiscovery
       ? JSON.stringify({
           name: "Rappels",
-          unique_id: "potager_hub_rappels",
+          unique_id: `${nodeId(d.cfg, "hub")}_rappels`,
           state_topic: rappelsTopic(d.cfg),
           value_template: "{{ value_json.total }}",
           json_attributes_topic: rappelsTopic(d.cfg),
           json_attributes_template: "{{ {'resume': value_json.resume, 'rappels': value_json['items']} | tojson }}",
           availability: [{ topic: statusTopic(d.cfg) }],
           icon: "mdi:clipboard-check-outline",
-          device: { identifiers: ["potager_hub"], name: "Potager", manufacturer: "Potager", model: "Application" },
+          device: { identifiers: [nodeId(d.cfg, "hub")], name: "Potager", manufacturer: "Potager", model: "Application" },
         })
       : "", // découverte désactivée : retire l'entité de Home Assistant
     true,
@@ -239,7 +244,7 @@ export function publishRappels(d: Deps) {
 
 /** Plant supprimé : on efface tout ce qui a été publié (retained). */
 export function removePlant(d: Deps, plantId: number) {
-  removeTopics(d, storedTopics().filter((t) => t.includes(`/potager_${plantId}/`)));
+  removeTopics(d, storedTopics().filter((t) => t.includes(`/${nodeId(d.cfg, plantId)}/`)));
   for (const t of [stateTopic(d.cfg, plantId), imageUrlTopic(d.cfg, plantId), imageB64Topic(d.cfg, plantId)]) d.publish(t, "", true);
 }
 
@@ -248,7 +253,7 @@ export async function syncAll(d: Deps): Promise<number> {
   const plants = listPlants();
   for (const p of plants) await syncPlant(d, p.id);
   // Entités de plants qui n'existent plus
-  const alive = new Set(plants.map((p) => `/potager_${p.id}/`));
+  const alive = new Set(plants.map((p) => `/${nodeId(d.cfg, p.id)}/`));
   const orphans = storedTopics().filter((t) => ![...alive].some((a) => t.includes(a)));
   removeTopics(d, orphans);
   publishRappels(d);
