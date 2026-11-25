@@ -1,0 +1,22 @@
+[Unit]
+Description=Potager (gestion de potager connecté)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=potager
+Group=potager
+WorkingDirectory=/opt/potager
+EnvironmentFile=/etc/potager.env
+ExecStart=/usr/bin/node /opt/potager/node_modules/next/dist/bin/next start
+Restart=always
+RestartSec=5
+# Durcissement léger (conteneur LXC)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
