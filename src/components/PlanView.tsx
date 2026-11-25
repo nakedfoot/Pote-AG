@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { savePlan, supprimerPlan, uploadPlan } from "@/app/actions/plan";
 import AutoRefresh from "@/components/AutoRefresh";
 
@@ -30,6 +30,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
     return r;
   });
   const [dirty, setDirty] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
   const box = useRef<HTMLDivElement>(null);
@@ -43,6 +44,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
   const setRect = (key: string, r: Rect | null) => {
     setRects((prev) => ({ ...prev, [key]: r }));
     setDirty(true);
+    setFailed(false);
     setMsg(null);
   };
 
@@ -95,22 +97,46 @@ export default function PlanView({ version, zones, carres }: { version: number |
         : { ...o, w: clamp(o.w + p.x - d.sx, MIN, 1 - o.x), h: clamp(o.h + p.y - d.sy, MIN, 1 - o.y) };
     setRects((prev) => ({ ...prev, [d.key]: next }));
     setDirty(true);
+    setFailed(false);
     setMsg(null);
   };
   const endDrag = () => {
     drag.current = null;
   };
 
-  const enregistrer = () =>
+  const enregistrer = () => {
+    const entries = [
+      ...zones.map((z) => ({ type: "zone", id: z.id, rect: rects[`z${z.id}`] ?? null })),
+      ...carres.map((c) => ({ type: "carre", id: c.id, rect: rects[`c${c.id}`] ?? null })),
+    ];
+    setDirty(false); // si on modifie encore pendant l'envoi, dirty repasse à true et un nouvel envoi suivra
     start(async () => {
-      const entries = [
-        ...zones.map((z) => ({ type: "zone", id: z.id, rect: rects[`z${z.id}`] ?? null })),
-        ...carres.map((c) => ({ type: "carre", id: c.id, rect: rects[`c${c.id}`] ?? null })),
-      ];
-      const r = await savePlan(JSON.stringify(entries));
-      setMsg({ ok: r.ok, text: r.message });
-      if (r.ok) setDirty(false);
+      try {
+        const r = await savePlan(JSON.stringify(entries));
+        setMsg({ ok: r.ok, text: r.ok ? "✓ Plan enregistré" : r.message });
+        if (!r.ok) setFailed(true);
+      } catch {
+        setMsg({ ok: false, text: "Enregistrement impossible (connexion perdue ou session expirée). Réessayez." });
+        setFailed(true);
+      }
     });
+  };
+
+  // Enregistrement automatique 0,7 s après la dernière modification (tracé, déplacement, retrait).
+  useEffect(() => {
+    if (!dirty || pending) return;
+    const t = setTimeout(enregistrer, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, pending, rects]);
+
+  // Évite de quitter la page avec une modification encore en cours d'envoi.
+  useEffect(() => {
+    if (!dirty && !pending) return;
+    const h = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [dirty, pending]);
 
   const rectStyle = (r: Rect): React.CSSProperties => ({
     left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%`,
@@ -142,13 +168,15 @@ export default function PlanView({ version, zones, carres }: { version: number |
           <button className={`px-3 py-1.5 ${!edit ? "bg-green-700 text-white" : ""}`} onClick={() => { setEdit(false); setArm(null); }}>Consulter</button>
           <button className={`px-3 py-1.5 ${edit ? "bg-green-700 text-white" : ""}`} onClick={() => setEdit(true)}>Modifier le plan</button>
         </div>
-        {edit && (
-          <>
-            <button className="btn" onClick={enregistrer} disabled={pending || !dirty}>{pending ? "Enregistrement…" : "Enregistrer le plan"}</button>
-            {dirty && <span className="text-xs text-amber-700">Modifications non enregistrées</span>}
-          </>
+        {/* État de l'enregistrement : visible aussi en mode « Consulter » */}
+        {pending ? (
+          <span className="text-sm text-muted">Enregistrement…</span>
+        ) : dirty ? (
+          <span className="text-sm text-amber-700">Modification en cours d&apos;enregistrement…</span>
+        ) : (
+          msg && <span className={`text-sm ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.text}</span>
         )}
-        {msg && <span className={`text-sm ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.text}</span>}
+        {failed && !pending && <button className="btn" onClick={enregistrer}>Réessayer</button>}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
@@ -245,7 +273,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
               ) : (
                 <p className="text-muted">
                   {nonPlaces > 0 ? `${nonPlaces} élément(s) pas encore placé(s). ` : ""}
-                  Cliquez « Placer », puis tracez le rectangle. Déplacez un rectangle en le faisant glisser, redimensionnez-le avec la poignée verte.
+                  Cliquez « Placer », puis tracez le rectangle. Déplacez un rectangle en le faisant glisser, redimensionnez-le avec la poignée verte. Les modifications sont enregistrées automatiquement.
                 </p>
               )}
               <ul className="space-y-1">
