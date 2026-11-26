@@ -50,6 +50,77 @@ function Feuillage({ cx, cy, rx, ry, yMax, H, rand }: { cx: number; cy: number; 
   );
 }
 
+type Segment = { x1: number; y1: number; x2: number; y2: number; w: number };
+
+/**
+ * Arbre : tronc évasé qui se divise en branches (récursivement, avec un peu de hasard),
+ * puis des bouquets de feuilles au bout des rameaux. Le ciel reste visible entre les branches.
+ */
+function Arbre({ H, rand, uid }: { H: number; rand: () => number; uid: string }) {
+  const tw = Math.max(2, H * 0.06); // largeur du tronc à la base
+  const yTronc = -H * 0.36; // sommet du tronc, où partent les branches
+  const segs: Segment[] = [];
+  const bouts: { x: number; y: number }[] = [];
+
+  const pousse = (x: number, y: number, ang: number, len: number, w: number, prof: number) => {
+    const x2 = x + Math.sin(ang) * len;
+    const y2 = y - Math.cos(ang) * len;
+    segs.push({ x1: x, y1: y, x2, y2, w });
+    if (prof === 0) {
+      bouts.push({ x: x2, y: y2 });
+      return;
+    }
+    const n = prof === 1 || rand() < 0.55 ? 2 : 3;
+    for (let k = 0; k < n; k++) {
+      const ecart = (k / (n - 1) - 0.5) * 1.15 + (rand() - 0.5) * 0.35;
+      pousse(x2, y2, ang + ecart, len * (0.66 + rand() * 0.16), w * 0.66, prof - 1);
+    }
+    // rameau secondaire en cours de route
+    if (prof >= 2 && rand() < 0.7) pousse((x + x2) / 2, (y + y2) / 2, ang + (rand() < 0.5 ? -1 : 1) * (0.7 + rand() * 0.4), len * 0.5, w * 0.5, prof - 2);
+  };
+
+  // Charpente : une flèche centrale et quelques maîtresses branches
+  pousse(0, yTronc, (rand() - 0.5) * 0.2, H * 0.2, tw * 0.5, 3);
+  pousse(0, yTronc + H * 0.02, -0.95, H * 0.17, tw * 0.42, 2);
+  pousse(0, yTronc + H * 0.02, 0.95, H * 0.17, tw * 0.42, 2);
+  pousse(0, yTronc - H * 0.07, -0.5, H * 0.17, tw * 0.38, 2);
+  pousse(0, yTronc - H * 0.07, 0.5, H * 0.17, tw * 0.38, 2);
+
+  // Feuilles en bouquets au bout des rameaux
+  const len = clamp(H * 0.085, 2.4, 7);
+  const rb = H * 0.085; // rayon d'un bouquet
+  const parBouquet = Math.round(clamp(240 / Math.max(1, bouts.length), 7, 22));
+  const cy = -H * 0.7, rx = H * 0.4, ry = H * 0.32;
+  const feuilles: { x: number; y: number; angle: number; ombre: number; taille: number }[] = [];
+  for (const b of bouts) {
+    for (let i = 0; i < parBouquet; i++) {
+      const r = Math.sqrt(rand()) * rb;
+      const th = rand() * Math.PI * 2;
+      const x = b.x + Math.cos(th) * r * 1.15;
+      const y = b.y + Math.sin(th) * r * 0.9 - rb * 0.15;
+      const px = clamp(x / rx, -1, 1);
+      const py = clamp((y - cy) / ry, -1, 1);
+      const ombre = clamp(0.5 + 0.32 * py + 0.14 * px + (rand() - 0.5) * 0.45, 0, 1);
+      feuilles.push({ x, y, angle: (Math.atan2(x - b.x, -(y - b.y)) * 180) / Math.PI + (rand() - 0.5) * 120, ombre: Math.round(ombre * 5), taille: len * (0.8 + rand() * 0.6) });
+    }
+  }
+  feuilles.sort((a, b) => b.ombre - a.ombre);
+
+  return (
+    <>
+      {/* Tronc évasé à la base, qui s'affine vers le sommet */}
+      <polygon
+        points={`${-tw * 0.95},0 ${-tw * 0.55},${-H * 0.1} ${-tw * 0.4},${yTronc} ${tw * 0.4},${yTronc} ${tw * 0.55},${-H * 0.1} ${tw * 0.95},0`}
+        fill={`url(#trunk${uid})`} stroke="#2f1d0e" strokeOpacity={0.5} strokeWidth={0.5}
+      />
+      {[...segs].sort((a, b) => b.w - a.w).map((g, i) => (
+        <line key={i} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke="#4e331c" strokeWidth={Math.max(0.6, g.w)} strokeLinecap="round" />
+      ))}
+      {feuilles.map((f, i) => feuille(f.x, f.y, f.angle, f.taille, VERTS[f.ombre], i))}
+    </>
+  );
+}
+
 /**
  * Plante dessinée en SVG, vue de face, posée au point (x, y) — la base de la plante.
  * `hcm` : hauteur en cm, `s` : pixels par cm. Les proportions (largeur / hauteur) suivent la forme de la plante :
@@ -68,23 +139,9 @@ export default function Plante3D({
   let corps: ReactNode;
 
   if (type === "arbre") {
-    // Tronc évasé à la base, branches, grande couronne (≈ 0,7 × la hauteur)
-    const rx = H * 0.36, ry = H * 0.3, cy = -H * 0.71;
-    W = rx * 2;
-    const tw = Math.max(2, H * 0.07);
-    const br = Math.max(1, tw * 0.45);
-    corps = (
-      <>
-        <polygon
-          points={`${-tw * 0.95},0 ${-tw * 0.5},${-H * 0.12} ${-tw * 0.32},${-H * 0.46} ${tw * 0.32},${-H * 0.46} ${tw * 0.5},${-H * 0.12} ${tw * 0.95},0`}
-          fill={u("trunk")} stroke="#2f1d0e" strokeOpacity={0.5} strokeWidth={0.5}
-        />
-        {[[-0.6, -0.62], [0.6, -0.64], [0, -0.78], [-0.3, -0.5], [0.32, -0.52]].map(([dx, dy], i) => (
-          <line key={i} x1={0} y1={-H * 0.4} x2={dx * rx} y2={dy * H} stroke="#4e331c" strokeWidth={br} strokeLinecap="round" />
-        ))}
-        <Feuillage cx={0} cy={cy} rx={rx} ry={ry} yMax={-H * 0.38} H={H} rand={rand} />
-      </>
-    );
+    // Couronne d'environ 0,8 × la hauteur
+    W = H * 0.8;
+    corps = <Arbre H={H} rand={rand} uid={uid} />;
   } else if (type === "arbuste") {
     // Buisson touffu, plusieurs tiges à la base
     const rx = H * 0.45, ry = H * 0.48;
