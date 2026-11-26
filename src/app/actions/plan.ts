@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { run } from "@/lib/db";
+import { get, run } from "@/lib/db";
+import { syncPlantNow } from "@/lib/mqtt-service";
 import { deletePlanImage, savePlanImage } from "@/lib/image";
 import type { ActionResult } from "./settings";
 
@@ -37,6 +38,22 @@ export async function savePlan(json: string): Promise<ActionResult> {
   return { ok: true, message: "Plan enregistré." };
 }
 
+/** Place un plant sur un carré (x, y : fractions 0..1 de la terre) ou le retire (carreId null). */
+export async function placerPlant(plantId: number, carreId: number | null, x: number, y: number): Promise<ActionResult> {
+  await requireUser();
+  const id = Number(plantId);
+  const plant = get<{ carre_id: number | null }>("SELECT carre_id FROM plant WHERE id = ?", id);
+  if (!plant) return { ok: false, message: "Plant introuvable." };
+  if (carreId === null) {
+    run("UPDATE plant SET carre_id = NULL, plan_x = NULL, plan_y = NULL WHERE id = ?", id);
+  } else {
+    if (!get("SELECT id FROM carre WHERE id = ?", Number(carreId))) return { ok: false, message: "Carré introuvable." };
+    run("UPDATE plant SET carre_id = ?, plan_x = ?, plan_y = ? WHERE id = ?", Number(carreId), clamp(x), clamp(y), id);
+  }
+  if (plant.carre_id !== carreId) syncPlantNow(id); // zone et carré font partie du message publié
+  return { ok: true, message: "Enregistré." };
+}
+
 export async function uploadPlan(formData: FormData) {
   await requireUser();
   const file = formData.get("plan");
@@ -47,7 +64,7 @@ export async function uploadPlan(formData: FormData) {
     redirect("/vue-potager?erreur=image");
   }
   revalidatePath("/vue-potager");
-  redirect("/vue-potager");
+  redirect("/vue-potager?vue=plan");
 }
 
 export async function supprimerPlan() {

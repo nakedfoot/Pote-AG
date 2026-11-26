@@ -1,11 +1,10 @@
 import { useId } from "react";
-import { PIED_HAUTEUR_CM, PIED_SECTION_CM } from "@/lib/carres";
+import { EPAISSEUR_CM, PIED_HAUTEUR_CM, PIED_SECTION_CM } from "@/lib/carres";
 
 const W = 240, H = 160;
 const PAD = { l: 30, r: 34, t: 10, b: 22 };
 const KX = 0.5, KY = 0.32; // inclinaison de la largeur (projection oblique)
 const PLANCHE_CM = 15; // hauteur d'une planche, pour le dessin du bois
-const EPAISSEUR_CM = 2.1; // épaisseur des planches du cadre
 
 const cm = (n: number) => `${Number(n.toFixed(1))} cm`;
 type Pt = [number, number];

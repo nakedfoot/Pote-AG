@@ -135,6 +135,11 @@ const MIGRATIONS: string[] = [
   `,
   // v7 : pieds optionnels aux quatre coins du carré
   `ALTER TABLE carre ADD COLUMN pieds INTEGER NOT NULL DEFAULT 0;`,
+  // v8 : position libre du plant dans son carré (fractions 0..1 de la surface de terre)
+  `
+  ALTER TABLE plant ADD COLUMN plan_x REAL;
+  ALTER TABLE plant ADD COLUMN plan_y REAL;
+  `,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };

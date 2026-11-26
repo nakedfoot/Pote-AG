@@ -28,6 +28,8 @@ export type Plant = {
   jours_recolte: number | null; comestible: string | null; toxicite: string | null; description: string | null;
   /** JSON SourcesData : provenance de chaque champ et identifiants dans chaque source */
   sources_data: string | null;
+  /** Position dans le carré (fractions 0..1 de la terre) ; null = disposition automatique */
+  plan_x: number | null; plan_y: number | null;
 };
 export type PlantRow = Plant & { carre_nom: string | null; zone_id: number | null; zone_nom: string | null };
 export type Evenement = { id: number; plant_id: number; type: string; date: string; commentaire: string | null };

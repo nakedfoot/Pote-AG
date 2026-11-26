@@ -1,6 +1,8 @@
 /** Pieds optionnels aux quatre coins : section carrée et hauteur, en cm. */
 export const PIED_SECTION_CM = 7;
 export const PIED_HAUTEUR_CM = 20;
+/** Épaisseur des planches du cadre, en cm. */
+export const EPAISSEUR_CM = 2.1;
 
 const fmt = (n: number) => String(Number(n.toFixed(1))).replace(".", ",");
 

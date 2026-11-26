@@ -107,6 +107,8 @@ export async function savePlant(formData: FormData) {
   const previousPhoto = id ? get<{ photo: string | null }>("SELECT photo FROM plant WHERE id = ?", id)?.photo ?? null : null;
   let plantId = id;
   if (id) {
+    // Changement de carré : la position dans l'ancien carré n'a plus de sens
+    run("UPDATE plant SET plan_x = CASE WHEN carre_id IS ? THEN plan_x END, plan_y = CASE WHEN carre_id IS ? THEN plan_y END WHERE id = ?", base.carre_id, base.carre_id, id);
     run(`UPDATE plant SET ${cols.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`, ...vals, id);
   } else {
     const r = run(
@@ -187,7 +189,9 @@ export async function dupliquerPlant(formData: FormData) {
   const src = get<Record<string, string | number | null>>("SELECT * FROM plant WHERE id = ?", id);
   if (!src) redirect("/");
   const cols = Object.keys(src).filter((c) => c !== "id" && c !== "created_at");
-  const vals = cols.map((c) => (c === "nom" ? `${src.nom} (copie)` : src[c]));
+  // La copie est décalée sur le carré pour ne pas être cachée sous l'original
+  const decale = (v: string | number | null) => (typeof v === "number" ? Math.min(1, v + 0.06) : v);
+  const vals = cols.map((c) => (c === "nom" ? `${src.nom} (copie)` : c === "plan_x" || c === "plan_y" ? decale(src[c]) : src[c]));
   const r = run(`INSERT INTO plant (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`, ...vals);
   const newId = Number(r.lastInsertRowid);
   // Photo téléversée : copie du fichier, pour que supprimer l'un des plants n'efface pas la photo de l'autre
@@ -224,7 +228,10 @@ export async function affecterPlant(formData: FormData) {
   await requireUser();
   const plantId = Number(formData.get("plant_id"));
   const carreId = Number(formData.get("carre_id")) || null;
-  run("UPDATE plant SET carre_id = ? WHERE id = ?", carreId, plantId);
+  run(
+    "UPDATE plant SET plan_x = CASE WHEN carre_id IS ? THEN plan_x END, plan_y = CASE WHEN carre_id IS ? THEN plan_y END, carre_id = ? WHERE id = ?",
+    carreId, carreId, carreId, plantId,
+  );
   syncPlantNow(plantId);
   revalidatePath("/", "layout");
 }
