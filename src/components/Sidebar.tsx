@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -22,6 +22,12 @@ const SETTINGS: Item[] = [
   { href: "/settings/users", label: "Utilisateurs", icon: "👤" },
 ];
 
+/** Petit indicateur sur le lien cliqué tant que la page n'est pas arrivée. */
+function Pending() {
+  const { pending } = useLinkStatus();
+  return pending ? <span aria-hidden className="ml-auto h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> : null;
+}
+
 function NavLink({ item, active, onNavigate }: { item: Item; active: boolean; onNavigate: () => void }) {
   const base = "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors";
   const cls = item.highlight
@@ -33,6 +39,7 @@ function NavLink({ item, active, onNavigate }: { item: Item; active: boolean; on
     <Link href={item.href} className={cls} onClick={onNavigate}>
       <span aria-hidden>{item.icon}</span>
       <span>{item.label}</span>
+      <Pending />
     </Link>
   );
 }
