@@ -99,6 +99,7 @@ export async function savePlant(formData: FormData) {
     statut: s(formData, "statut") || "croissance",
     notes: nul(s(formData, "notes")),
     type_plante: estTypePlante(s(formData, "type_plante")) ? s(formData, "type_plante") : null,
+    quantite: Math.min(9999, Math.max(1, Math.round(num(formData, "quantite") ?? 1))),
     ...botanique,
     sources_data: JSON.stringify(sources),
   };
@@ -109,7 +110,10 @@ export async function savePlant(formData: FormData) {
   let plantId = id;
   if (id) {
     // Changement de carré : la position dans l'ancien carré n'a plus de sens
-    run("UPDATE plant SET plan_x = CASE WHEN carre_id IS ? THEN plan_x END, plan_y = CASE WHEN carre_id IS ? THEN plan_y END WHERE id = ?", base.carre_id, base.carre_id, id);
+    run(
+      "UPDATE plant SET plan_x = CASE WHEN carre_id IS ? THEN plan_x END, plan_y = CASE WHEN carre_id IS ? THEN plan_y END, plan_w = CASE WHEN carre_id IS ? THEN plan_w END, plan_h = CASE WHEN carre_id IS ? THEN plan_h END WHERE id = ?",
+      base.carre_id, base.carre_id, base.carre_id, base.carre_id, id,
+    );
     run(`UPDATE plant SET ${cols.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`, ...vals, id);
   } else {
     const r = run(
@@ -230,8 +234,8 @@ export async function affecterPlant(formData: FormData) {
   const plantId = Number(formData.get("plant_id"));
   const carreId = Number(formData.get("carre_id")) || null;
   run(
-    "UPDATE plant SET plan_x = CASE WHEN carre_id IS ? THEN plan_x END, plan_y = CASE WHEN carre_id IS ? THEN plan_y END, carre_id = ? WHERE id = ?",
-    carreId, carreId, carreId, plantId,
+    "UPDATE plant SET plan_x = CASE WHEN carre_id IS ? THEN plan_x END, plan_y = CASE WHEN carre_id IS ? THEN plan_y END, plan_w = CASE WHEN carre_id IS ? THEN plan_w END, plan_h = CASE WHEN carre_id IS ? THEN plan_h END, carre_id = ? WHERE id = ?",
+    carreId, carreId, carreId, carreId, carreId, plantId,
   );
   syncPlantNow(plantId);
   revalidatePath("/", "layout");

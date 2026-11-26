@@ -38,17 +38,23 @@ export async function savePlan(json: string): Promise<ActionResult> {
   return { ok: true, message: "Plan enregistré." };
 }
 
-/** Place un plant sur un carré (x, y : fractions 0..1 de la terre) ou le retire (carreId null). */
-export async function placerPlant(plantId: number, carreId: number | null, x: number, y: number): Promise<ActionResult> {
+/**
+ * Place un plant sur un carré ou le retire (carreId null). x, y : centre de sa zone de plantation et w, h : taille de
+ * cette zone, en fractions 0..1 de la terre ; w et h null = taille par défaut (selon le nombre d'unités).
+ */
+export async function placerPlant(
+  plantId: number, carreId: number | null, x: number, y: number, w: number | null = null, h: number | null = null,
+): Promise<ActionResult> {
   await requireUser();
   const id = Number(plantId);
   const plant = get<{ carre_id: number | null }>("SELECT carre_id FROM plant WHERE id = ?", id);
   if (!plant) return { ok: false, message: "Plant introuvable." };
   if (carreId === null) {
-    run("UPDATE plant SET carre_id = NULL, plan_x = NULL, plan_y = NULL WHERE id = ?", id);
+    run("UPDATE plant SET carre_id = NULL, plan_x = NULL, plan_y = NULL, plan_w = NULL, plan_h = NULL WHERE id = ?", id);
   } else {
     if (!get("SELECT id FROM carre WHERE id = ?", Number(carreId))) return { ok: false, message: "Carré introuvable." };
-    run("UPDATE plant SET carre_id = ?, plan_x = ?, plan_y = ? WHERE id = ?", Number(carreId), clamp(x), clamp(y), id);
+    const taille = (v: number | null) => (v === null ? null : Math.min(1, Math.max(0.03, Number(v) || 0.03)));
+    run("UPDATE plant SET carre_id = ?, plan_x = ?, plan_y = ?, plan_w = ?, plan_h = ? WHERE id = ?", Number(carreId), clamp(x), clamp(y), taille(w), taille(h), id);
   }
   if (plant.carre_id !== carreId) syncPlantNow(id); // zone et carré font partie du message publié
   return { ok: true, message: "Enregistré." };

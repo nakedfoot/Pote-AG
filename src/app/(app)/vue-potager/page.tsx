@@ -56,7 +56,7 @@ function Carres({ zones, carres, plants }: { zones: ReturnType<typeof listZones>
     const s = plantStatus(p);
     return {
       id: p.id, nom: p.nom, variete: p.variete, photo: p.photo, espacement: p.espacement_cm,
-      carre_id: p.carre_id, x: p.plan_x, y: p.plan_y, etat: s.mesures.length ? s.pire : "inconnu",
+      carre_id: p.carre_id, x: p.plan_x, y: p.plan_y, w: p.plan_w, h: p.plan_h, quantite: p.quantite, etat: s.mesures.length ? s.pire : "inconnu",
     };
   });
   return <PotagerBoard carres={boardCarres} plants={boardPlants} />;

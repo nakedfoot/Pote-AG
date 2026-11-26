@@ -142,6 +142,12 @@ const MIGRATIONS: string[] = [
   `,
   // v9 : forme de la plante (arbre, arbuste, fleur…) pour son dessin dans le carré ; null = déduite du nom
   `ALTER TABLE plant ADD COLUMN type_plante TEXT;`,
+  // v10 : nombre d'unités plantées (une fiche = une surface de plantation) et taille de cette surface dans le carré
+  `
+  ALTER TABLE plant ADD COLUMN quantite INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE plant ADD COLUMN plan_w REAL;
+  ALTER TABLE plant ADD COLUMN plan_h REAL;
+  `,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };

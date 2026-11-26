@@ -58,6 +58,8 @@ export type PlantDessin = {
   fruit: string | null;
   /** Couleur des petites fleurs (arbres et arbustes non fruitiers qui fleurissent), sinon null */
   fleurs: string | null;
+  /** Numéro de l'unité quand la fiche en représente plusieurs (0 sinon) : même id, dessins différents */
+  k?: number;
 };
 
 const sansAccent = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -135,6 +137,39 @@ const FLEURS_ARBRES: [RegExp, string][] = [
 export function couleurFleur(nom: string, nomScientifique: string | null): string | null {
   const t = sansAccent(`${nom} ${nomScientifique ?? ""}`);
   return FLEURS_ARBRES.find(([re]) => re.test(t))?.[1] ?? null;
+}
+
+/** Nombre maximal d'unités dessinées en vue du dessus et en 3D (au-delà : « +N » ou plafonné). */
+export const UNITES_MAX_DESSUS = 60;
+export const UNITES_MAX_3D = 36;
+/** Taille minimale d'une zone de plantation (fraction de la terre). */
+export const ZONE_MIN = 0.06;
+
+/** Colonnes et lignes d'une grille de `n` unités dans une zone de wCm × hCm. */
+export function dimsGrille(n: number, wCm: number, hCm: number): { cols: number; rows: number } {
+  const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt((n * wCm) / Math.max(hCm, 1)))));
+  return { cols, rows: Math.ceil(n / cols) };
+}
+
+/** Positions (fractions 0..1 de la zone) de `n` unités réparties en grille régulière dans une zone de wCm × hCm. */
+export function grilleUnites(n: number, wCm: number, hCm: number): { x: number; y: number }[] {
+  const { cols, rows } = dimsGrille(n, wCm, hCm);
+  return Array.from({ length: n }, (_, i) => ({ x: ((i % cols) + 0.5) / cols, y: (Math.floor(i / cols) + 0.5) / rows }));
+}
+
+/**
+ * Taille par défaut (fractions 0..1 de la terre) de la zone de plantation d'un plant, d'après son nombre d'unités et
+ * son espacement : un plant seul occupe un petit carré, plusieurs unités une grille aux mailles de l'espacement.
+ */
+export function tailleZoneDefaut(quantite: number, espacement: number | null, solLongCm: number, solLargCm: number): { w: number; h: number } {
+  const n = Math.max(1, quantite);
+  if (n === 1) {
+    const d = Math.min(60, Math.max(15, espacement ?? 30));
+    return { w: Math.min(1, d / solLongCm), h: Math.min(1, d / solLargCm) };
+  }
+  const maille = Math.min(40, Math.max(5, espacement ?? 20));
+  const { cols, rows } = dimsGrille(n, solLongCm, solLargCm);
+  return { w: Math.min(0.95, (cols * maille) / solLongCm), h: Math.min(0.95, (rows * maille) / solLargCm) };
 }
 
 /** Grille régulière de `n` positions (fractions 0..1) dans un rectangle de proportions `ratio` = longueur / largeur. */

@@ -30,6 +30,10 @@ export type Plant = {
   sources_data: string | null;
   /** Position dans le carré (fractions 0..1 de la terre) ; null = disposition automatique */
   plan_x: number | null; plan_y: number | null;
+  /** Taille de la zone de plantation dans le carré (fractions 0..1 de la terre) ; null = taille par défaut */
+  plan_w: number | null; plan_h: number | null;
+  /** Nombre d'unités plantées (≥ 1) */
+  quantite: number;
   /** Forme dessinée dans le carré (clé de TYPES_PLANTE) ; null = déduite du nom */
   type_plante: string | null;
 };

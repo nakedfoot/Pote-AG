@@ -202,7 +202,7 @@ export default function CarreGraphic({
       {rendus.length > 0 && (
         <g clipPath={f("plantes")}>
           {rendus.map(({ p, bx, by }) => (
-            <Plante3D key={p.id} type={p.type} x={bx} y={by} hcm={p.hc} esp={p.espacement} fruit={p.fruit} fleurs={p.fleurs} s={s} id={p.id} uid={uid} />
+            <Plante3D key={`${p.id}-${p.k ?? 0}`} type={p.type} x={bx} y={by} hcm={p.hc} esp={p.espacement} fruit={p.fruit} fleurs={p.fleurs} s={s} id={p.id + (p.k ?? 0) * 1009} uid={uid} />
           ))}
         </g>
       )}

@@ -268,6 +268,11 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
             {Object.entries(TYPES_PLANTE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
         </div>
+        <div>
+          <label className="label">Nombre d&apos;unités plantées</label>
+          <input name="quantite" type="number" min="1" step="1" defaultValue={plant?.quantite ?? 1} className="input sm:max-w-40" />
+          <p className="mt-1 text-xs text-muted">Pour une surface de plantation (carottes, oignons en rangées…) : une seule fiche, plusieurs unités. Dans la vue potager, la zone redimensionnable en affiche autant.</p>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label">Stade</label>
