@@ -158,3 +158,35 @@ export function suggererSeuils(plants: { min: number | null; max: number | null 
   const moy = milieux.reduce((a, b) => a + b, 0) / milieux.length;
   return { seuil, cible: Math.min(100, Math.max(seuil + 5, Math.round(moy))) };
 }
+
+// ---------- Prévision ----------
+/** Premier instant ≥ ts situé dans une plage autorisée (ts lui-même s'il y est déjà ; au plus 48 h plus tard). */
+export function prochaineOuverture(plages: Plage[], ts: number, tz: string): number {
+  if (dansPlages(plages, ts, tz)) return ts;
+  const PAS = 5 * 60_000;
+  for (let t = ts + PAS; t <= ts + 48 * 3_600_000; t += PAS) if (dansPlages(plages, t, tz)) return t;
+  return ts;
+}
+
+/** Pente (points d'humidité par heure) d'une série par régression linéaire ; null si la série est trop courte. */
+export function penteParHeure(points: { ts: number; valeur: number }[]): number | null {
+  if (points.length < 6 || points[points.length - 1].ts - points[0].ts < 3 * 3_600_000) return null;
+  const t0 = points[0].ts;
+  const xs = points.map((p) => (p.ts - t0) / 3_600_000);
+  const n = points.length;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = points.reduce((a, p) => a + p.valeur, 0) / n;
+  const den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+  if (den === 0) return null;
+  return xs.reduce((a, x, i) => a + (x - mx) * (points[i].valeur - my), 0) / den;
+}
+
+/** « maintenant », « aujourd'hui 19:00 », « demain 05:00 » ou « ven. 28/11 05:00 » dans le fuseau donné. */
+export function libelleQuand(ts: number, tz: string, now = Date.now()): string {
+  if (ts <= now + 60_000) return "maintenant";
+  const jour = (t: number) => new Date(t).toLocaleDateString("en-CA", { timeZone: tz });
+  const heure = new Date(ts).toLocaleTimeString("fr-FR", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
+  if (jour(ts) === jour(now)) return `aujourd'hui ${heure}`;
+  if (jour(ts) === jour(now + 24 * 3_600_000)) return `demain ${heure}`;
+  return `${new Date(ts).toLocaleDateString("fr-FR", { timeZone: tz, weekday: "short", day: "2-digit", month: "2-digit" })} ${heure}`;
+}

@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { arroser } from "@/app/actions/garden";
 import AutoRefresh from "@/components/AutoRefresh";
+import { libelleQuand } from "@/lib/irrigation";
+import { listPrevisions } from "@/lib/irrigation-service";
 import { METRICS } from "@/lib/metrics";
 import { rappelsDuPlant } from "@/lib/rappels";
+import { getIrrigationSettings } from "@/lib/settings";
 import { ageJours, listPlants, plantStatus, type PlantRow, type PlantStatus } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +76,9 @@ export default function SynthesePage() {
   const surveiller = items.filter(({ s }) => s.pire === "bas" || s.pire === "haut" || s.batterieBasse).length;
   const recoltes = items.flatMap(({ p, s }) => rappelsDuPlant(p, s)).filter((r) => r.type === "recolte" || r.type === "recolte_retard").length;
 
+  const previsions = listPrevisions();
+  const fuseau = getIrrigationSettings().fuseau;
+
   // Résumé par zone
   const zones = new Map<string, { total: number; secs: number; autres: number }>();
   for (const { p, s } of items) {
@@ -96,6 +102,24 @@ export default function SynthesePage() {
         <Kpi icone="⚠️" valeur={surveiller} label="à surveiller" alerte />
         <Kpi icone="🧺" valeur={recoltes} label="récoltes proches" />
       </div>
+
+      {previsions.length > 0 && (
+        <section className="card space-y-2">
+          <h2 className="font-semibold">💦 Prochaines irrigations <Link href="/irrigation" className="ml-2 text-sm font-normal hover:underline">Voir l&apos;irrigation →</Link></h2>
+          <ul className="divide-y divide-border text-sm">
+            {previsions.map((p) => (
+              <li key={p.canalId} className="flex flex-wrap items-baseline gap-x-3 py-2">
+                <span className="w-44 shrink-0 font-medium">🚿 {p.nom}</span>
+                <span className={`w-36 shrink-0 ${p.type === "en_cours" ? "font-semibold text-blue-700 dark:text-blue-300" : p.type === "bloque" ? "text-amber-700 dark:text-amber-400" : ""}`}>
+                  {p.quand !== null ? libelleQuand(p.quand, fuseau) : "—"}
+                </span>
+                <span className="min-w-0 flex-1 text-muted">{p.texte}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted">L&apos;irrigation est déclenchée par les capteurs (pas par un calendrier) : les dates sont des estimations qui évoluent avec l&apos;humidité, la météo et les plages horaires.</p>
+        </section>
+      )}
 
       <section className="card space-y-2">
         <h2 className="font-semibold">💧 À arroser <span className="font-normal text-muted">· {secs.length}</span></h2>

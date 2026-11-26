@@ -1,6 +1,6 @@
 import { all, get, run as sql } from "./db";
 import {
-  PLAFOND_OUVERTURE_S, dansPlages, debutJourLocal, dureePalierS, nouveauMinParPoint, parseConfig, prochainePlage, type CanalConfig,
+  PLAFOND_OUVERTURE_S, dansPlages, debutJourLocal, dureePalierS, nouveauMinParPoint, parseConfig, penteParHeure, prochaineOuverture, prochainePlage, type CanalConfig,
 } from "./irrigation";
 import { meteoActuelle, meteoFiable, pluiePassee, pluiePrevue, refreshMeteo, tempMeteo } from "./meteo";
 import { deviceState, getPublishDeps, isMqttConnected, publishCommand } from "./mqtt-service";
@@ -553,6 +553,72 @@ export function listCanauxVue(): CanalVue[] {
       dernier: get<{ ts: number; message: string; niveau: string }>("SELECT ts, message, niveau FROM irrigation_log WHERE canal_id = ? AND type != 'bloque' ORDER BY ts DESC, id DESC LIMIT 1", c.id) ?? null,
     };
   });
+}
+
+// ---------- Prévision des prochains arrosages ----------
+export type Prevision = { canalId: number; nom: string; quand: number | null; texte: string; type: "en_cours" | "prevu" | "estime" | "bloque" | "aucun" };
+
+/** Série d'humidité (12 h) du capteur le plus sec du canal. */
+function serieHumidite(canalId: number, now: number): { ts: number; valeur: number }[] {
+  const caps = all<{ capteur_id: number; champ: string }>(
+    `SELECT DISTINCT pc.capteur_id, pc.champ FROM plant_capteur pc JOIN plant p ON p.id = pc.plant_id
+     JOIN irrigation_canal_carre cc ON cc.carre_id = p.carre_id WHERE cc.canal_id = ? AND pc.metrique = 'hum_sol'`,
+    canalId,
+  );
+  let best: { capteur_id: number; champ: string } | null = null;
+  let bestV = Infinity;
+  for (const c of caps) {
+    const m = get<{ valeur: number }>("SELECT valeur FROM mesure WHERE capteur_id = ? AND champ = ? ORDER BY ts DESC LIMIT 1", c.capteur_id, c.champ);
+    if (m && m.valeur < bestV) { bestV = m.valeur; best = c; }
+  }
+  if (!best) return [];
+  return all<{ ts: number; valeur: number }>("SELECT ts, valeur FROM mesure WHERE capteur_id = ? AND champ = ? AND ts >= ? ORDER BY ts", best.capteur_id, best.champ, now - 12 * 3_600_000);
+}
+
+/**
+ * Prochains arrosages attendus. L'irrigation étant déclenchée par les capteurs (pas par un calendrier),
+ * c'est une estimation : fin du palier en cours, prochain palier, reprise après un blocage horaire/quota,
+ * ou moment où le sol devrait passer sous le seuil d'après sa vitesse de séchage récente.
+ */
+export function listPrevisions(): Prevision[] {
+  const now = io.now();
+  const s = getIrrigationSettings();
+  const out: Prevision[] = [];
+  for (const c of listCanaux()) {
+    if (!c.actif || !c.vanne) continue;
+    const cfg = parseConfig(c.config);
+    const base = { canalId: c.id, nom: c.nom };
+    const run = mem().runs.get(c.id);
+    if (run) {
+      if (run.phase === "ouvert") out.push({ ...base, quand: run.fermeA, type: "en_cours", texte: run.manuel ? "Arrosage manuel en cours, fin prévue" : `Palier ${run.palier}/${cfg.paliers_max} en cours, fin prévue` });
+      else if (run.phase === "pause") out.push({ ...base, quand: prochaineOuverture(cfg.plages, run.finPause, s.fuseau), type: "prevu", texte: `Palier ${run.palier + 1} si le sol n'a pas atteint ${cfg.cible} %` });
+      else out.push({ ...base, quand: null, type: "prevu", texte: `Palier ${run.palier + 1} dès la prochaine mesure si le sol n'a pas atteint ${cfg.cible} %` });
+      continue;
+    }
+    if (!c.auto) { out.push({ ...base, quand: null, type: "aucun", texte: "Mode manuel : aucun déclenchement automatique" }); continue; }
+    const ev = mem().evals.get(c.id);
+    if (!ev) continue;
+    const apres = (t: number) => prochaineOuverture(cfg.plages, t, s.fuseau);
+    if (ev.kind === "pause_globale") out.push({ ...base, quand: null, type: "aucun", texte: "Pause globale des arrosages" });
+    else if (ev.kind === "ok") out.push({ ...base, quand: now, type: "prevu", texte: `Imminent : ${ev.message.toLowerCase()}` });
+    else if (ev.kind === "bloque" || ev.kind === "hors_ligne") {
+      const jour = debutJourLocal(now, s.fuseau);
+      const fin = get<{ ts: number }>("SELECT MAX(ts) ts FROM irrigation_log WHERE canal_id = ? AND type = 'fin'", c.id)?.ts ?? 0;
+      const quand = ev.code === "plage" ? apres(now)
+        : ev.code === "repos" ? apres(fin + cfg.delai_cycles_min * MIN)
+        : ev.code === "quota_duree" || ev.code === "quota_cycles" ? apres(jour + 24 * 3_600_000)
+        : null;
+      out.push({ ...base, quand, type: "bloque", texte: `Arrosage nécessaire mais reporté : ${ev.message}` });
+    } else if (ev.kind === "inutile" && ev.hum !== null) {
+      const pente = penteParHeure(serieHumidite(c.id, now));
+      if (pente !== null && pente < -0.05) {
+        const heures = Math.max(0, (ev.hum - cfg.seuil) / -pente);
+        out.push({ ...base, quand: apres(now + heures * 3_600_000), type: "estime", texte: `Estimation : le sol (${Math.round(ev.hum * 10) / 10} %) atteindrait ${cfg.seuil} % dans ~${heures < 1 ? "moins d'1 h" : `${Math.round(heures)} h`} (séchage ${Math.round(-pente * 100) / 100} pt/h)` });
+      } else out.push({ ...base, quand: null, type: "aucun", texte: `Pas de besoin prévisible (sol à ${Math.round(ev.hum * 10) / 10} %, seuil ${cfg.seuil} %)` });
+    }
+  }
+  // Les arrosages datés d'abord (par date), puis le reste
+  return out.sort((a, b) => (a.quand ?? Infinity) - (b.quand ?? Infinity));
 }
 
 // ---------- Publication MQTT / Home Assistant ----------
