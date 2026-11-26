@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placerPlant } from "@/app/actions/plan";
 import CarreDessus from "@/components/CarreDessus";
@@ -62,7 +61,6 @@ function Avatar({ p, className, style }: { p: BoardPlant; className: string; sty
 }
 
 export default function PotagerBoard({ carres, plants }: { carres: BoardCarre[]; plants: BoardPlant[] }) {
-  const router = useRouter();
   const [pos, setPos] = useState(() => initiales(plants, carres));
   const [drag, setDrag] = useState<Drag | null>(null);
   const [resize, setResize] = useState<Resize | null>(null);
@@ -118,10 +116,7 @@ export default function PotagerBoard({ carres, plants }: { carres: BoardCarre[];
 
     const drop = (d: Drag, x: number, y: number) => {
       const prev = posRef.current[d.id];
-      if (!d.moved) {
-        if (prev?.carreId !== null) router.push(`/plants/${d.id}`); // simple clic sur un plant placé : ouvre sa fiche
-        return;
-      }
+      if (!d.moved) return; // simple clic : rien
       const els = document.elementsFromPoint(x, y).filter((e): e is HTMLElement => e instanceof HTMLElement);
       const box = els.find((e) => e.dataset.carreBox !== undefined);
       const soil = box?.querySelector<HTMLElement>("[data-carre-soil]");
@@ -171,7 +166,7 @@ export default function PotagerBoard({ carres, plants }: { carres: BoardCarre[];
       window.removeEventListener("pointercancel", cancel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging, router]);
+  }, [dragging]);
 
   // ---- Redimensionnement de la zone (poignées aux quatre coins) ----
   useEffect(() => {
@@ -356,7 +351,7 @@ export default function PotagerBoard({ carres, plants }: { carres: BoardCarre[];
         <aside data-drop-liste className="card space-y-3 self-start lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           <div>
             <h2 className="font-semibold">🌱 Plants</h2>
-            <p className="text-xs text-muted">Glissez un plant sur un carré pour le placer, ou ici pour le retirer. Clic sur un plant placé : sa fiche.</p>
+            <p className="text-xs text-muted">Glissez un plant sur un carré pour le placer, ou ici pour le retirer.</p>
           </div>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher…" className="input" />
           {plants.length === 0 && <p className="text-sm text-muted">Aucun plant. <Link href="/plants/new" className="underline">Ajouter un plant</Link>.</p>}
