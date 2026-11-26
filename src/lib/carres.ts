@@ -43,6 +43,7 @@ export const TYPES_PLANTE = {
   arbuste: "Arbuste",
   arbre: "Arbre",
   grimpante: "Grimpante",
+  fraisier: "Fraisier",
 } as const;
 export type TypePlante = keyof typeof TYPES_PLANTE;
 export const estTypePlante = (v: unknown): v is TypePlante => typeof v === "string" && v in TYPES_PLANTE;
@@ -61,6 +62,7 @@ export type PlantDessin = {
 
 const sansAccent = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const MOTS: [TypePlante, RegExp][] = [
+  ["fraisier", /fraisier|fraise|fragaria/],
   ["arbre", /pommier|poirier|cerisier|prunier|olivier|figuier|abricotier|pecher|oranger|citronnier|noyer|chene|erable|chataignier|amandier|mirabellier|cognassier|\barbre\b|prunus|malus|pyrus|citrus|ficus|juglans|olea\b|castanea|amygdalus|quercus|fagus|acer\b/],
   ["grimpante", /vigne|clematite|lierre|kiwi|pois de senteur|chevrefeuille|houblon|glycine|jasmin|liseron|grimpant/],
   ["arbuste", /framboisier|groseillier|cassis|cassissier|myrtille|rosier|buis|noisetier|romarin|hortensia|lilas|laurier|forsythia|arbuste|murier|ribes|rubus|vaccinium|rosa\b|corylus|buxus/],
@@ -86,6 +88,7 @@ export function estFruitier(comestible: string | null, nom = "", nomScientifique
 }
 
 const FRUITS: [RegExp, string][] = [
+  [/fraise|fraisier|fragaria/, "#d3142b"],
   [/mirabelle/, "#f0c23a"],
   [/pomm|malus/, "#d9362b"],
   [/poir|pyrus/, "#c8cf3a"],

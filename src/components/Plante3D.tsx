@@ -219,6 +219,69 @@ export default function Plante3D({
         ])}
       </>
     );
+  } else if (type === "fraisier") {
+    // Fraisier : rosette basse de feuilles à trois folioles, fleurs blanches, fraises pendantes sur les côtés
+    const wcm = clamp((esp ?? hcm * 2.4) * 0.8, hcm * 1.4, hcm * 3);
+    W = Math.max(wcm * s, 10);
+    const ls = H * 0.22; // taille d'une foliole
+    const n = 9;
+    const feuillage = Array.from({ length: n }, (_, i) => {
+      const f = i / (n - 1);
+      const a = -78 + 156 * f + (rand() - 0.5) * 10;
+      const len = H * (0.25 + 0.3 * rand());
+      const tx = Math.sin((a * Math.PI) / 180) * len * (W / H > 1.6 ? 1.6 : 1.1);
+      const ty = -Math.cos((a * Math.PI) / 180) * len * 0.8 - H * 0.1;
+      const fill = u(i % 2 ? "leafD" : "leafL");
+      return (
+        <g key={i}>
+          <line x1={0} y1={0} x2={tx} y2={ty} stroke="#4f8a34" strokeWidth={Math.max(0.6, H * 0.025)} strokeLinecap="round" />
+          <g transform={`translate(${tx.toFixed(2)} ${ty.toFixed(2)})`}>
+            {[0, -40, 40].map((d, k) => (
+              <g key={k} transform={`rotate(${(a * 0.6 + d).toFixed(0)})`}>
+                <ellipse cx={0} cy={-ls * 0.7} rx={ls * (k ? 0.5 : 0.62)} ry={ls * (k ? 0.62 : 0.78)} fill={fill} stroke="#1f4d1a" strokeOpacity={0.45} strokeWidth={0.4} />
+                <line x1={0} y1={0} x2={0} y2={-ls * 1.25} stroke="#2f6a26" strokeOpacity={0.5} strokeWidth={0.3} />
+              </g>
+            ))}
+          </g>
+        </g>
+      );
+    });
+    const rf = clamp(H * 0.1, 1.6, 5); // fleurs
+    const rb = clamp(H * 0.13, 1.8, 6); // fraises
+    const rouge = fruit ?? "#d3142b";
+    corps = (
+      <>
+        {feuillage}
+        {[-0.2, 0.05, 0.25].map((dx, i) => {
+          const fx = dx * W, fy = -H * (0.8 + (i % 2) * 0.1);
+          return (
+            <g key={`f${i}`}>
+              <line x1={0} y1={-H * 0.1} x2={fx} y2={fy} stroke="#4f8a34" strokeWidth={Math.max(0.5, H * 0.02)} />
+              <g transform={`translate(${fx.toFixed(2)} ${fy.toFixed(2)})`}>
+                {Array.from({ length: 5 }, (_, k) => (
+                  <circle key={k} cx={Math.cos((k * 2 * Math.PI) / 5) * rf * 0.6} cy={Math.sin((k * 2 * Math.PI) / 5) * rf * 0.6} r={rf * 0.5} fill="#fff" stroke="#000" strokeOpacity={0.2} strokeWidth={0.25} />
+                ))}
+                <circle r={rf * 0.3} fill="#f5c52e" />
+              </g>
+            </g>
+          );
+        })}
+        {fruit !== null && [[-0.4, 0.2], [0.36, 0.16], [-0.18, 0.1], [0.14, 0.24]].map(([dx, dy], i) => {
+          const bx = dx * W, by = -H * dy;
+          return (
+            <g key={`b${i}`}>
+              <path d={`M0,${-H * 0.12} Q${bx * 0.5},${by - rb * 2.2} ${bx},${by - rb}`} fill="none" stroke="#4f8a34" strokeWidth={Math.max(0.5, H * 0.02)} />
+              <path d={`M${bx - rb * 0.8},${by - rb * 0.9} Q${bx - rb * 0.9},${by + rb * 0.6} ${bx},${by + rb * 1.2} Q${bx + rb * 0.9},${by + rb * 0.6} ${bx + rb * 0.8},${by - rb * 0.9} Z`} fill={rouge} stroke="#000" strokeOpacity={0.3} strokeWidth={0.4} />
+              {[[-0.3, -0.2], [0.3, -0.1], [0, 0.3], [-0.2, 0.5], [0.25, 0.5]].map(([gx, gy], k) => (
+                <circle key={k} cx={bx + gx * rb} cy={by + gy * rb} r={Math.max(0.25, rb * 0.07)} fill="#f8e08a" />
+              ))}
+              <circle cx={bx - rb * 0.3} cy={by - rb * 0.4} r={rb * 0.18} fill="#fff" opacity={0.5} />
+              <path d={`M${bx - rb * 0.6},${by - rb * 0.95} L${bx},${by - rb * 0.5} L${bx + rb * 0.6},${by - rb * 0.95} L${bx + rb * 0.2},${by - rb * 1.2} L${bx - rb * 0.2},${by - rb * 1.2} Z`} fill="#3f8f2e" />
+            </g>
+          );
+        })}
+      </>
+    );
   } else {
     // Légume, aromatique, herbacée : touffe de feuilles ; la largeur suit l'espacement mais reste proportionnée à la hauteur
     const wcm = clamp((esp ?? hcm * 0.9) * 0.8, hcm * 0.55, hcm * 1.3);
