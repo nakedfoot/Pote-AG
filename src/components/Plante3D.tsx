@@ -1,10 +1,8 @@
 import type { ReactNode } from "react";
 import type { TypePlante } from "@/lib/carres";
+import { MODELES, VERTS, clamp } from "./modeles-potagers";
 
-const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
 const FLEURS = ["#ec4899", "#f59e0b", "#a855f7", "#ef4444", "#f8fafc", "#facc15"];
-/** Verts du plus clair (0) au plus sombre (5) */
-const VERTS = ["#a6e06b", "#86ca4f", "#64b23c", "#489834", "#337d29", "#23631f"];
 /** Feuille pointue de longueur 1, base en (0,0), pointe vers le haut */
 const FEUILLE = "M0,0 C0.32,-0.18 0.34,-0.7 0,-1 C-0.34,-0.7 -0.32,-0.18 0,0Z";
 
@@ -178,7 +176,12 @@ export default function Plante3D({
   let W: number;
   let corps: ReactNode;
 
-  if (type === "arbre") {
+  const modele = MODELES[type];
+  if (modele) {
+    const m = modele({ H, hcm, esp, s, rand, u, fruit, fleurs });
+    W = m.W;
+    corps = m.corps;
+  } else if (type === "arbre") {
     // Couronne d'environ 0,8 × la hauteur
     W = H * 0.8;
     corps = <Arbre H={H} rand={rand} uid={uid} fruit={fruit} fleurs={fleurs} />;

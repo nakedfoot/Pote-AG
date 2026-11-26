@@ -44,6 +44,18 @@ export const TYPES_PLANTE = {
   arbre: "Arbre",
   grimpante: "Grimpante",
   fraisier: "Fraisier",
+  oignon: "Oignon, ail, poireau",
+  ciboulette: "Ciboulette",
+  romarin: "Romarin",
+  thym: "Thym, origan",
+  persil: "Persil, coriandre",
+  estragon: "Estragon, basilic, menthe, sauge",
+  laurier: "Laurier",
+  carotte: "Carotte, panais, radis",
+  pomme_de_terre: "Pomme de terre",
+  tomate: "Tomate, aubergine, poivron",
+  courgette: "Courgette, concombre",
+  melon: "Melon, pastèque, courge",
 } as const;
 export type TypePlante = keyof typeof TYPES_PLANTE;
 export const estTypePlante = (v: unknown): v is TypePlante => typeof v === "string" && v in TYPES_PLANTE;
@@ -65,6 +77,18 @@ export type PlantDessin = {
 const sansAccent = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const MOTS: [TypePlante, RegExp][] = [
   ["fraisier", /fraisier|fraise|fragaria/],
+  ["pomme_de_terre", /pomme de terre|solanum tuberosum/],
+  ["tomate", /tomate|aubergine|poivron|piment|solanum lycopersicum|solanum melongena|capsicum/],
+  ["melon", /melon|pasteque|courge|potiron|citrouille|potimarron|butternut|cucumis melo|citrullus|cucurbita (maxima|moschata)/],
+  ["courgette", /courgette|concombre|cucurbita pepo|cucumis sativus/],
+  ["ciboulette", /ciboulette|ciboule|schoenoprasum|allium fistulosum/],
+  ["oignon", /oignon|ail|echalote|poireau|allium/],
+  ["carotte", /carotte|panais|radis|navet|betterave|daucus|pastinaca|raphanus/],
+  ["persil", /persil|coriandre|cerfeuil|celeri|petroselinum|coriandrum|anthriscus/],
+  ["romarin", /romarin|rosmarinus/],
+  ["thym", /thym|thymus|origan|origanum|serpolet|marjolaine|sarriette/],
+  ["estragon", /estragon|dracunculus|basilic|ocimum|menthe|mentha|sauge|salvia|melisse|verveine/],
+  ["laurier", /laurier|laurus/],
   ["arbre", /pommier|poirier|cerisier|prunier|olivier|figuier|abricotier|pecher|oranger|citronnier|noyer|chene|erable|chataignier|amandier|mirabellier|cognassier|\barbre\b|prunus|malus|pyrus|citrus|ficus|juglans|olea\b|castanea|amygdalus|quercus|fagus|acer\b/],
   ["grimpante", /vigne|clematite|lierre|kiwi|pois de senteur|chevrefeuille|houblon|glycine|jasmin|liseron|grimpant/],
   ["arbuste", /framboisier|groseillier|cassis|cassissier|myrtille|rosier|buis|noisetier|romarin|hortensia|lilas|laurier|forsythia|arbuste|murier|ribes|rubus|vaccinium|rosa\b|corylus|buxus/],
@@ -85,11 +109,19 @@ export function devinerType(nom: string, nomScientifique: string | null, hauteur
 export function estFruitier(comestible: string | null, nom = "", nomScientifique: string | null = null): boolean {
   if (comestible && /fruit/i.test(sansAccent(comestible))) return true;
   const t = sansAccent(`${nom} ${nomScientifique ?? ""}`);
-  if (/laurier/.test(t)) return false; // laurier-cerise, laurier-rose… : pas des fruitiers
+  if (/laurier|pomme de terre|solanum tuberosum/.test(t)) return false; // laurier-cerise, laurier-rose, pomme de terre : pas des fruitiers
   return FRUITS.some(([re]) => re.test(t));
 }
 
 const FRUITS: [RegExp, string][] = [
+  [/tomate|solanum lycopersicum/, "#d8321f"],
+  [/aubergine|solanum melongena/, "#4a1d5c"],
+  [/poivron|piment|capsicum/, "#e0382a"],
+  [/courgette|cucurbita pepo/, "#3f7d2b"],
+  [/concombre|cucumis sativus/, "#4f8f2e"],
+  [/pasteque|citrullus/, "#2f7d3a"],
+  [/melon|cucumis melo/, "#e3c35f"],
+  [/courge|potiron|citrouille|potimarron|butternut|cucurbita/, "#e8821e"],
   [/fraise|fraisier|fragaria/, "#d3142b"],
   [/mirabelle/, "#f0c23a"],
   [/pomm|malus/, "#d9362b"],
@@ -130,6 +162,9 @@ const FLEURS_ARBRES: [RegExp, string][] = [
   [/forsythia|mimosa|genet|cytise|cytisus|spartium|laburnum|mahonia|millepertuis|hypericum/, "#f7d63a"],
   [/magnolia|cerisier du japon|prunus serrulata|spiree|spiraea|weigela|althea|abelia/, "#f4b6c8"],
   [/camelia|camellia|rhododendron|azalee|fuchsia|hibiscus|oleandre|laurier rose|nerium/, "#e0457f"],
+  [/thym|thymus|origan|origanum|serpolet|marjolaine/, "#d9a0d9"],
+  [/ciboulette|schoenoprasum/, "#c77dd8"],
+  [/sauge|salvia(?! rosmarinus)/, "#7a6fd0"],
   [/jasmin|seringat|philadelphus|sureau|sambucus|aubepine|crataegus|viburnum|deutzia|escallonia|cistus|tilleul|robinier|bruyere|erica|calluna/, "#fbf6ea"],
 ];
 
