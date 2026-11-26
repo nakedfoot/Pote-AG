@@ -51,7 +51,11 @@ export const estTypePlante = (v: unknown): v is TypePlante => typeof v === "stri
 export const HAUTEUR_DEFAUT_CM = 15;
 
 /** Plant tel que dessiné dans un carré : position (fractions 0..1 de la terre, y = 0 au fond), forme, hauteur en cm. */
-export type PlantDessin = { id: number; nom: string; x: number; y: number; type: TypePlante; hauteur: number; espacement: number | null };
+export type PlantDessin = {
+  id: number; nom: string; x: number; y: number; type: TypePlante; hauteur: number; espacement: number | null;
+  /** Couleur des fruits à dessiner (arbres et arbustes fruitiers), sinon null */
+  fruit: string | null;
+};
 
 const sansAccent = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const MOTS: [TypePlante, RegExp][] = [
@@ -66,6 +70,36 @@ export function devinerType(nom: string, nomScientifique: string | null, hauteur
   const t = sansAccent(`${nom} ${nomScientifique ?? ""}`);
   for (const [type, re] of MOTS) if (re.test(t)) return type;
   return hauteurAdulteCm !== null && hauteurAdulteCm >= 400 ? "arbre" : "herbacee";
+}
+
+/** Fruitier : les sources botaniques (Perenual, Trefle) indiquent des fruits comestibles. */
+export const estFruitier = (comestible: string | null) => !!comestible && /fruit/i.test(sansAccent(comestible));
+
+const FRUITS: [RegExp, string][] = [
+  [/mirabelle/, "#f0c23a"],
+  [/pomm/, "#d9362b"],
+  [/poir/, "#c8cf3a"],
+  [/cerise|cerisier/, "#a3122a"],
+  [/prun|quetsche/, "#6b3a8f"],
+  [/abricot/, "#f2a03d"],
+  [/pech/, "#f4a07a"],
+  [/orang|clementine|mandarine/, "#f28c1c"],
+  [/citron/, "#f2dc2e"],
+  [/fig/, "#5b3a6e"],
+  [/framboise/, "#c2185b"],
+  [/groseille/, "#d11a2a"],
+  [/cassis/, "#2b1b3a"],
+  [/myrtille/, "#3b4a8a"],
+  [/raisin|vigne|vitis/, "#6a3d7d"],
+  [/kiwi/, "#8a6a3a"],
+  [/noix|noyer|noisett/, "#8a6a3a"],
+  [/olive/, "#5a6b2a"],
+];
+
+/** Couleur des fruits d'après le nom (et le nom scientifique) ; rouge orangé par défaut. */
+export function couleurFruit(nom: string, nomScientifique: string | null): string {
+  const t = sansAccent(`${nom} ${nomScientifique ?? ""}`);
+  return FRUITS.find(([re]) => re.test(t))?.[1] ?? "#e0432f";
 }
 
 /** Grille régulière de `n` positions (fractions 0..1) dans un rectangle de proportions `ratio` = longueur / largeur. */

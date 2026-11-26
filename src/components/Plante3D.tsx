@@ -23,42 +23,20 @@ const feuille = (x: number, y: number, angle: number, taille: number, fill: stri
   <path key={key} d={FEUILLE} fill={fill} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${angle.toFixed(0)}) scale(${(taille * 0.62).toFixed(2)} ${taille.toFixed(2)})`} />
 );
 
-/**
- * Feuillage dense : un grand nombre de petites feuilles réparties dans une ellipse, orientées vers l'extérieur.
- * Les feuilles claires (en haut à gauche, face à la lumière) sont dessinées par-dessus les sombres.
- */
-function Feuillage({ cx, cy, rx, ry, yMax, H, rand }: { cx: number; cy: number; rx: number; ry: number; yMax: number; H: number; rand: () => number }) {
-  const len = clamp(H * 0.075, 2.2, 6.5);
-  const n = Math.round(clamp((Math.PI * rx * ry) / (len * len * 0.15), 40, 280));
-  const feuilles = Array.from({ length: n }, () => {
-    const r = Math.sqrt(rand());
-    const th = rand() * Math.PI * 2;
-    const px = Math.cos(th) * r;
-    const py = Math.sin(th) * r; // négatif = vers le haut
-    const x = cx + px * rx;
-    const y = Math.min(cy + py * ry, yMax - rand() * len * 0.6);
-    const ombre = clamp(0.5 + 0.32 * py + 0.14 * px + (rand() - 0.5) * 0.45, 0, 1);
-    const angle = (Math.atan2(px, -py) * 180) / Math.PI + (rand() - 0.5) * 110;
-    return { x, y, angle, ombre: Math.round(ombre * 5), taille: len * (0.8 + rand() * 0.6) };
-  });
-  feuilles.sort((a, b) => b.ombre - a.ombre);
-  return (
-    <>
-      <ellipse cx={cx} cy={Math.min(cy, yMax - ry * 0.0)} rx={rx * 0.9} ry={ry * 0.88} fill={VERTS[4]} />
-      {feuilles.map((f, i) => feuille(f.x, f.y, f.angle, f.taille, VERTS[f.ombre], i))}
-    </>
-  );
-}
-
 type Segment = { x1: number; y1: number; x2: number; y2: number; w: number };
+/** Départ d'une branche : position, angle (rad, 0 = vertical), longueur, épaisseur, profondeur de ramification */
+type Depart = [x: number, y: number, ang: number, len: number, w: number, prof: number];
 
 /**
- * Arbre : tronc évasé qui se divise en branches (récursivement, avec un peu de hasard),
- * puis des bouquets de feuilles au bout des rameaux. Le ciel reste visible entre les branches.
+ * Ramure : des branches qui se divisent (récursivement, avec un peu de hasard), puis des bouquets de feuilles
+ * au bout des rameaux. Le ciel reste visible entre les branches. Sert à l'arbre et à l'arbuste.
  */
-function Arbre({ H, rand, uid }: { H: number; rand: () => number; uid: string }) {
-  const tw = Math.max(2, H * 0.06); // largeur du tronc à la base
-  const yTronc = -H * 0.36; // sommet du tronc, où partent les branches
+function Ramure({
+  rand, departs, tronc, feuillesTotal, rayonBouquet, tailleFeuille, centre, rx, ry, ecart, fruit,
+}: {
+  rand: () => number; departs: Depart[]; tronc?: ReactNode; feuillesTotal: number; rayonBouquet: number;
+  tailleFeuille: number; centre: number; rx: number; ry: number; ecart: number; fruit?: { couleur: string; rayon: number } | null;
+}) {
   const segs: Segment[] = [];
   const bouts: { x: number; y: number }[] = [];
 
@@ -72,52 +50,95 @@ function Arbre({ H, rand, uid }: { H: number; rand: () => number; uid: string })
     }
     const n = prof === 1 || rand() < 0.55 ? 2 : 3;
     for (let k = 0; k < n; k++) {
-      const ecart = (k / (n - 1) - 0.5) * 1.15 + (rand() - 0.5) * 0.35;
-      pousse(x2, y2, ang + ecart, len * (0.66 + rand() * 0.16), w * 0.66, prof - 1);
+      const e = (k / (n - 1) - 0.5) * ecart + (rand() - 0.5) * 0.35;
+      pousse(x2, y2, ang + e, len * (0.66 + rand() * 0.16), w * 0.66, prof - 1);
     }
     // rameau secondaire en cours de route
     if (prof >= 2 && rand() < 0.7) pousse((x + x2) / 2, (y + y2) / 2, ang + (rand() < 0.5 ? -1 : 1) * (0.7 + rand() * 0.4), len * 0.5, w * 0.5, prof - 2);
   };
+  for (const d of departs) pousse(...d);
 
-  // Charpente : une flèche centrale et quelques maîtresses branches
-  pousse(0, yTronc, (rand() - 0.5) * 0.2, H * 0.2, tw * 0.5, 3);
-  pousse(0, yTronc + H * 0.02, -0.95, H * 0.17, tw * 0.42, 2);
-  pousse(0, yTronc + H * 0.02, 0.95, H * 0.17, tw * 0.42, 2);
-  pousse(0, yTronc - H * 0.07, -0.5, H * 0.17, tw * 0.38, 2);
-  pousse(0, yTronc - H * 0.07, 0.5, H * 0.17, tw * 0.38, 2);
-
-  // Feuilles en bouquets au bout des rameaux
-  const len = clamp(H * 0.085, 2.4, 7);
-  const rb = H * 0.085; // rayon d'un bouquet
-  const parBouquet = Math.round(clamp(240 / Math.max(1, bouts.length), 7, 22));
-  const cy = -H * 0.7, rx = H * 0.4, ry = H * 0.32;
+  const parBouquet = Math.round(clamp(feuillesTotal / Math.max(1, bouts.length), 6, 24));
   const feuilles: { x: number; y: number; angle: number; ombre: number; taille: number }[] = [];
   for (const b of bouts) {
     for (let i = 0; i < parBouquet; i++) {
-      const r = Math.sqrt(rand()) * rb;
+      const r = Math.sqrt(rand()) * rayonBouquet;
       const th = rand() * Math.PI * 2;
       const x = b.x + Math.cos(th) * r * 1.15;
-      const y = b.y + Math.sin(th) * r * 0.9 - rb * 0.15;
+      const y = b.y + Math.sin(th) * r * 0.9 - rayonBouquet * 0.15;
       const px = clamp(x / rx, -1, 1);
-      const py = clamp((y - cy) / ry, -1, 1);
+      const py = clamp((y - centre) / ry, -1, 1);
       const ombre = clamp(0.5 + 0.32 * py + 0.14 * px + (rand() - 0.5) * 0.45, 0, 1);
-      feuilles.push({ x, y, angle: (Math.atan2(x - b.x, -(y - b.y)) * 180) / Math.PI + (rand() - 0.5) * 120, ombre: Math.round(ombre * 5), taille: len * (0.8 + rand() * 0.6) });
+      feuilles.push({ x, y, angle: (Math.atan2(x - b.x, -(y - b.y)) * 180) / Math.PI + (rand() - 0.5) * 120, ombre: Math.round(ombre * 5), taille: tailleFeuille * (0.8 + rand() * 0.6) });
     }
   }
   feuilles.sort((a, b) => b.ombre - a.ombre);
 
+  // Fruits : accrochés sous quelques bouquets (tirés après les feuilles : le feuillage reste identique avec ou sans fruits)
+  const fruits = fruit
+    ? Array.from({ length: Math.round(clamp(bouts.length * 0.45, 5, 16)) }, () => {
+        const b = bouts[Math.floor(rand() * bouts.length)];
+        return { x: b.x + (rand() - 0.5) * rayonBouquet * 1.4, y: b.y + rayonBouquet * (0.15 + rand() * 0.55) };
+      })
+    : [];
+
   return (
     <>
-      {/* Tronc évasé à la base, qui s'affine vers le sommet */}
-      <polygon
-        points={`${-tw * 0.95},0 ${-tw * 0.55},${-H * 0.1} ${-tw * 0.4},${yTronc} ${tw * 0.4},${yTronc} ${tw * 0.55},${-H * 0.1} ${tw * 0.95},0`}
-        fill={`url(#trunk${uid})`} stroke="#2f1d0e" strokeOpacity={0.5} strokeWidth={0.5}
-      />
+      {tronc}
       {[...segs].sort((a, b) => b.w - a.w).map((g, i) => (
         <line key={i} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke="#4e331c" strokeWidth={Math.max(0.6, g.w)} strokeLinecap="round" />
       ))}
       {feuilles.map((f, i) => feuille(f.x, f.y, f.angle, f.taille, VERTS[f.ombre], i))}
+      {fruit && fruits.map((f, i) => (
+        <g key={`fruit${i}`}>
+          <circle cx={f.x} cy={f.y} r={fruit.rayon} fill={fruit.couleur} stroke="#000" strokeOpacity={0.3} strokeWidth={0.4} />
+          <circle cx={f.x - fruit.rayon * 0.3} cy={f.y - fruit.rayon * 0.3} r={fruit.rayon * 0.3} fill="#fff" opacity={0.55} />
+        </g>
+      ))}
     </>
+  );
+}
+
+/** Arbre : tronc évasé qui se divise en une flèche centrale et quatre maîtresses branches. */
+function Arbre({ H, rand, uid, fruit }: { H: number; rand: () => number; uid: string; fruit: string | null }) {
+  const tw = Math.max(2, H * 0.06); // largeur du tronc à la base
+  const yTronc = -H * 0.36; // sommet du tronc, où partent les branches
+  const tronc = (
+    <polygon
+      points={`${-tw * 0.95},0 ${-tw * 0.55},${-H * 0.1} ${-tw * 0.4},${yTronc} ${tw * 0.4},${yTronc} ${tw * 0.55},${-H * 0.1} ${tw * 0.95},0`}
+      fill={`url(#trunk${uid})`} stroke="#2f1d0e" strokeOpacity={0.5} strokeWidth={0.5}
+    />
+  );
+  const departs: Depart[] = [
+    [0, yTronc, (rand() - 0.5) * 0.2, H * 0.2, tw * 0.5, 3],
+    [0, yTronc + H * 0.02, -0.95, H * 0.17, tw * 0.42, 2],
+    [0, yTronc + H * 0.02, 0.95, H * 0.17, tw * 0.42, 2],
+    [0, yTronc - H * 0.07, -0.5, H * 0.17, tw * 0.38, 2],
+    [0, yTronc - H * 0.07, 0.5, H * 0.17, tw * 0.38, 2],
+  ];
+  return (
+    <Ramure
+      rand={rand} departs={departs} tronc={tronc} feuillesTotal={240} rayonBouquet={H * 0.085}
+      tailleFeuille={clamp(H * 0.085, 2.4, 7)} centre={-H * 0.7} rx={H * 0.4} ry={H * 0.32} ecart={1.15}
+      fruit={fruit ? { couleur: fruit, rayon: clamp(H * 0.03, 1.4, 5) } : null}
+    />
+  );
+}
+
+/** Arbuste : plusieurs tiges qui partent du sol et se ramifient, feuillage plus touffu que l'arbre. */
+function Arbuste({ H, rand, fruit }: { H: number; rand: () => number; fruit: string | null }) {
+  const n = 6;
+  const w = Math.max(0.9, H * 0.022);
+  const departs: Depart[] = Array.from({ length: n }, (_, k) => {
+    const f = k / (n - 1) - 0.5; // -0,5 … 0,5
+    return [f * H * 0.16, 0, f * 1.15 + (rand() - 0.5) * 0.2, H * (0.2 + rand() * 0.06), w, 3];
+  });
+  return (
+    <Ramure
+      rand={rand} departs={departs} feuillesTotal={480} rayonBouquet={H * 0.085}
+      tailleFeuille={clamp(H * 0.075, 2.2, 6.5)} centre={-H * 0.55} rx={H * 0.45} ry={H * 0.47} ecart={1.0}
+      fruit={fruit ? { couleur: fruit, rayon: clamp(H * 0.026, 1.2, 4) } : null}
+    />
   );
 }
 
@@ -128,9 +149,9 @@ function Arbre({ H, rand, uid }: { H: number; rand: () => number; uid: string })
  * viennent du `<defs>` parent.
  */
 export default function Plante3D({
-  type, x, y, hcm, esp, s, id, uid,
+  type, x, y, hcm, esp, fruit = null, s, id, uid,
 }: {
-  type: TypePlante; x: number; y: number; hcm: number; esp: number | null; s: number; id: number; uid: string;
+  type: TypePlante; x: number; y: number; hcm: number; esp: number | null; fruit?: string | null; s: number; id: number; uid: string;
 }) {
   const H = Math.max(hcm * s, 6);
   const u = (n: string) => `url(#${n}${uid})`;
@@ -141,19 +162,11 @@ export default function Plante3D({
   if (type === "arbre") {
     // Couronne d'environ 0,8 × la hauteur
     W = H * 0.8;
-    corps = <Arbre H={H} rand={rand} uid={uid} />;
+    corps = <Arbre H={H} rand={rand} uid={uid} fruit={fruit} />;
   } else if (type === "arbuste") {
-    // Buisson touffu, plusieurs tiges à la base
-    const rx = H * 0.45, ry = H * 0.48;
-    W = rx * 2;
-    corps = (
-      <>
-        {[-0.5, -0.17, 0.17, 0.5].map((dx, i) => (
-          <line key={i} x1={dx * rx * 0.2} y1={0} x2={dx * rx * 0.9} y2={-H * 0.4} stroke="#5a3b1f" strokeWidth={Math.max(1, H * 0.025)} strokeLinecap="round" />
-        ))}
-        <Feuillage cx={0} cy={-H * 0.52} rx={rx} ry={ry} yMax={-H * 0.05} H={H} rand={rand} />
-      </>
-    );
+    // Buisson : environ 0,9 × la hauteur de large
+    W = H * 0.9;
+    corps = <Arbuste H={H} rand={rand} fruit={fruit} />;
   } else if (type === "fleur") {
     W = Math.max(H * 0.35, 5);
     const r = clamp(H * 0.13, 2.5, 14);

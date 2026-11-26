@@ -1,4 +1,4 @@
-import { DEFAUT_CARRE_CM, HAUTEUR_DEFAUT_CM, devinerType, estTypePlante, grille, type PlantDessin } from "./carres";
+import { DEFAUT_CARRE_CM, HAUTEUR_DEFAUT_CM, couleurFruit, devinerType, estFruitier, estTypePlante, grille, type PlantDessin } from "./carres";
 import { derniereHauteur, listPlants } from "./queries";
 
 /** Plants de chaque carré, prêts à être dessinés (positions de la vue potager, hauteur mesurée ou 15 cm). */
@@ -27,6 +27,7 @@ export function plantsParCarre(carres: { id: number; longueur_cm: number | null;
           type: estTypePlante(p.type_plante) ? p.type_plante : devinerType(p.nom, p.nom_scientifique, p.hauteur_cm),
           hauteur: mesuree && mesuree > 0 ? mesuree : HAUTEUR_DEFAUT_CM,
           espacement: p.espacement_cm,
+          fruit: estFruitier(p.comestible) ? couleurFruit(p.nom, p.nom_scientifique) : null,
         };
       }),
     );
