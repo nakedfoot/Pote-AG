@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { savePlan, savePlanEchelle, supprimerPlan, uploadPlan } from "@/app/actions/plan";
 import AutoRefresh from "@/components/AutoRefresh";
 import CarreDessus from "@/components/CarreDessus";
-import Zoomable from "@/components/Zoomable";
 import { DEFAUT_CARRE_CM, formatDimensions } from "@/lib/carres";
 
 export type Rect = { x: number; y: number; w: number; h: number }; // fractions (0..1) de l'image
@@ -21,6 +20,7 @@ export type CarreItem = {
 const COULEUR: Record<Etat2, string> = { ok: "#16a34a", bas: "#f59e0b", haut: "#dc2626", inconnu: "#6b7280", vide: "#94a3b8" };
 const LIBELLE: Record<Etat2, string> = { ok: "OK", bas: "Trop bas", haut: "Trop haut", inconnu: "Pas de mesure", vide: "Aucun plant" };
 const MIN = 0.02;
+const BTN_ZOOM = "flex h-7 w-7 items-center justify-center rounded-lg bg-card/90 text-sm shadow hover:bg-card";
 /** Largeur réelle supposée de l'image tant que l'échelle n'est pas renseignée (cm) */
 const ECHELLE_DEFAUT_CM = 2000;
 const clamp = (n: number, a = 0, b = 1) => Math.min(b, Math.max(a, n));
@@ -52,6 +52,19 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
   const drag = useRef<Drag | null>(null);
   const drawStart = useRef<{ x: number; y: number } | null>(null);
   const ghostRef = useRef(ghost);
+  // Zoom à la molette : échelle k et décalage (tx, ty) en pixels du plan, par rapport à son coin haut-gauche
+  const [vue, setVue] = useState({ k: 1, tx: 0, ty: 0 });
+  const viewport = useRef<HTMLDivElement>(null);
+  const pan = useRef<{ sx: number; sy: number; tx: number; ty: number } | null>(null);
+  /** Zoom d'un facteur `facteur` autour du point (px, py) du cadre, en gardant le plan couvrant tout le cadre. */
+  const zoomer = (facteur: number, px: number, py: number) =>
+    setVue((v) => {
+      const el = viewport.current;
+      const k = clamp(v.k * facteur, 1, 8);
+      if (!el || k === 1) return { k, tx: 0, ty: 0 };
+      const f = k / v.k;
+      return { k, tx: clamp(px - (px - v.tx) * f, el.clientWidth * (1 - k), 0), ty: clamp(py - (py - v.ty) * f, el.clientHeight * (1 - k), 0) };
+    });
   const rectsRef = useRef(rects);
   const rotsRef = useRef(rots);
   const echelle = echelleCm ?? ECHELLE_DEFAUT_CM;
@@ -77,6 +90,22 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
     rectsRef.current = rects;
     rotsRef.current = rots;
   }, [ghost, rects, rots]);
+  const hasPlan = version !== null;
+  useEffect(() => {
+    const el = viewport.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const b = el.getBoundingClientRect();
+      zoomer(Math.exp(-e.deltaY * 0.0015), e.clientX - b.left, e.clientY - b.top);
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [hasPlan]);
+  const zoomCentre = (facteur: number) => {
+    const el = viewport.current;
+    if (el) zoomer(facteur, el.clientWidth / 2, el.clientHeight / 2);
+  };
   const setRect = (key: string, r: Rect | null) => {
     setRects((prev) => ({ ...prev, [key]: r }));
     setDirty(true);
@@ -153,7 +182,8 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
       const c = carres.find((x) => x.id === g.id);
       if (!c) return;
       const b = box.current.getBoundingClientRect();
-      const dansPlan = e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom;
+      const v = viewport.current?.getBoundingClientRect() ?? b; // seule la partie visible du plan reçoit le dépôt
+      const dansPlan = e.clientX >= Math.max(b.left, v.left) && e.clientX <= Math.min(b.right, v.right) && e.clientY >= Math.max(b.top, v.top) && e.clientY <= Math.min(b.bottom, v.bottom);
       if (dansPlan) {
         // Le carré se centre sur le point de dépôt
         const t = tailleCarre(c);
@@ -298,11 +328,35 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        {/* ---- Plan (zoomable : le plan reste en place dans la grille, sa hauteur ne dépend pas de celle du panneau) ---- */}
-        <Zoomable wide className="">
+        {/* ---- Plan : molette = zoom, glisser le fond = déplacer (le cadre garde la hauteur de l'image) ---- */}
+        <div
+          ref={viewport}
+          className="relative self-start overflow-hidden rounded-xl border border-border"
+          style={{ touchAction: vue.k > 1 ? "none" : "pan-y" }}
+          onPointerDown={(e) => {
+            if (arm || vue.k === 1 || (e.pointerType === "mouse" && e.button !== 0)) return;
+            if ((e.target as HTMLElement).closest("[data-plan-item]")) return;
+            pan.current = { sx: e.clientX, sy: e.clientY, tx: vue.tx, ty: vue.ty };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            const p = pan.current;
+            const el = viewport.current;
+            if (!p || !el) return;
+            setVue((v) => ({ ...v, tx: clamp(p.tx + e.clientX - p.sx, el.clientWidth * (1 - v.k), 0), ty: clamp(p.ty + e.clientY - p.sy, el.clientHeight * (1 - v.k), 0) }));
+          }}
+          onPointerUp={() => { pan.current = null; }}
+          onPointerCancel={() => { pan.current = null; }}
+        >
+        <div className="absolute right-2 top-2 z-[60] flex gap-1">
+          <button type="button" title="Zoom avant" aria-label="Zoom avant" onClick={() => zoomCentre(1.5)} className={BTN_ZOOM}>+</button>
+          <button type="button" title="Zoom arrière" aria-label="Zoom arrière" onClick={() => zoomCentre(1 / 1.5)} className={BTN_ZOOM}>−</button>
+          <button type="button" title="Vue entière" aria-label="Vue entière" onClick={() => setVue({ k: 1, tx: 0, ty: 0 })} className={BTN_ZOOM}>⟲</button>
+        </div>
         <div
           ref={box}
-          className="relative select-none overflow-hidden rounded-xl border border-border"
+          className="relative select-none overflow-hidden"
+          style={{ transform: `translate(${vue.tx}px, ${vue.ty}px) scale(${vue.k})`, transformOrigin: "0 0" }}
           onClick={() => !edit && setSelected(null)}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -325,7 +379,7 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
               <div
                 key={key}
                 style={{ ...rectStyle(r), borderColor: z.couleur, backgroundColor: `${z.couleur}1f`, touchAction: edit ? "none" : "auto" }}
-                className={`absolute z-10 rounded-md border-2 border-dashed ${selected === key ? "ring-2 ring-white/80" : ""} ${edit && !arm ? "cursor-move" : ""}`}
+                data-plan-item className={`absolute z-10 rounded-md border-2 border-dashed ${selected === key ? "ring-2 ring-white/80" : ""} ${edit && !arm ? "cursor-move" : ""}`}
                 onPointerDown={(e) => startDrag(e, key, "move")}
                 onPointerMove={onDragMove}
                 onPointerUp={endDrag}
@@ -354,7 +408,7 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
               <div
                 key={key}
                 style={{ ...rectStyle(r), transform: `rotate(${rots[c.id] ?? 0}deg)`, touchAction: edit ? "none" : "auto" }}
-                className={`absolute ${selected === key ? "z-30" : "z-20"} ${edit && !arm ? "cursor-move" : "cursor-pointer"}`}
+                data-plan-item className={`absolute ${selected === key ? "z-30" : "z-20"} ${edit && !arm ? "cursor-move" : "cursor-pointer"}`}
                 onPointerDown={(e) => startDrag(e, key, "move", r)}
                 onPointerMove={onDragMove}
                 onPointerUp={endDrag}
@@ -399,7 +453,7 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
             />
           )}
         </div>
-        </Zoomable>
+        </div>
 
         {/* ---- Panneau latéral ---- */}
         <aside data-drop-liste className="card space-y-3 self-start text-sm">
