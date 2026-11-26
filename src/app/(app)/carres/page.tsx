@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { deleteCarre, saveCarre } from "@/app/actions/garden";
 import CarreGraphic from "@/components/CarreGraphic";
-import { formatDimensions, parseAncienneDimension, surfaceM2 } from "@/lib/carres";
+import { PIED_HAUTEUR_CM, PIED_SECTION_CM, formatDimensions, parseAncienneDimension, surfaceM2 } from "@/lib/carres";
 import { listCarres, listZones } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -48,10 +48,11 @@ export default async function CarresPage() {
                 </div>
                 <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-xs dark:bg-white/10">🌱 {c.nb_plants}</span>
               </div>
-              <CarreGraphic longueur={longueur} largeur={largeur} hauteur={c.hauteur_cm} />
+              <CarreGraphic longueur={longueur} largeur={largeur} hauteur={c.hauteur_cm} pieds={c.pieds === 1} />
               <p className="text-xs text-muted">
                 {formatDimensions(longueur, largeur, c.hauteur_cm) ?? "Dimensions non renseignées"}
                 {surface !== null && ` · ${Number(surface.toFixed(2))} m²`}
+                {c.pieds === 1 && " · sur pieds"}
                 {c.exposition && ` · ${c.exposition}`}
               </p>
               {ancien && <p className="text-xs text-amber-700">Cotes reprises de « {c.dimensions} » : enregistrez pour les confirmer.</p>}
@@ -75,7 +76,7 @@ export default async function CarresPage() {
   );
 }
 
-function CarreFields({ zones, c }: { zones: { id: number; nom: string }[]; c?: { zone_id: number; nom: string; longueur_cm: number | null; largeur_cm: number | null; hauteur_cm: number | null; exposition: string | null } }) {
+function CarreFields({ zones, c }: { zones: { id: number; nom: string }[]; c?: { zone_id: number; nom: string; longueur_cm: number | null; largeur_cm: number | null; hauteur_cm: number | null; pieds: number; exposition: string | null } }) {
   return (
     <div className="grid grid-cols-3 gap-2">
       <div className="col-span-3 sm:col-span-1">
@@ -100,6 +101,10 @@ function CarreFields({ zones, c }: { zones: { id: number; nom: string }[]; c?: {
         <label className="label">Hauteur (cm)</label>
         <input name="hauteur_cm" type="number" step="any" min="1" defaultValue={c?.hauteur_cm ?? ""} placeholder="30" className="input" />
       </div>
+      <label className="col-span-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" name="pieds" defaultChecked={c?.pieds === 1} />
+        Quatre pieds aux coins ({PIED_SECTION_CM} × {PIED_SECTION_CM} × {PIED_HAUTEUR_CM} cm)
+      </label>
       <div className="col-span-3">
         <label className="label">Exposition</label>
         <input name="exposition" defaultValue={c?.exposition ?? ""} placeholder="ex. Plein soleil" className="input" />

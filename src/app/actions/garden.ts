@@ -54,8 +54,9 @@ export async function saveCarre(formData: FormData) {
   const hauteur = pos("hauteur_cm");
   const dim = formatDimensions(longueur, largeur, hauteur);
   const expo = nul(s(formData, "exposition"));
-  if (id) run("UPDATE carre SET zone_id = ?, nom = ?, dimensions = ?, longueur_cm = ?, largeur_cm = ?, hauteur_cm = ?, exposition = ? WHERE id = ?", zone, nom, dim, longueur, largeur, hauteur, expo, id);
-  else run("INSERT INTO carre (zone_id, nom, dimensions, longueur_cm, largeur_cm, hauteur_cm, exposition) VALUES (?, ?, ?, ?, ?, ?, ?)", zone, nom, dim, longueur, largeur, hauteur, expo);
+  const pieds = formData.get("pieds") ? 1 : 0;
+  if (id) run("UPDATE carre SET zone_id = ?, nom = ?, dimensions = ?, longueur_cm = ?, largeur_cm = ?, hauteur_cm = ?, pieds = ?, exposition = ? WHERE id = ?", zone, nom, dim, longueur, largeur, hauteur, pieds, expo, id);
+  else run("INSERT INTO carre (zone_id, nom, dimensions, longueur_cm, largeur_cm, hauteur_cm, pieds, exposition) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", zone, nom, dim, longueur, largeur, hauteur, pieds, expo);
   syncAllNow().catch(() => {});
   redirect("/carres");
 }

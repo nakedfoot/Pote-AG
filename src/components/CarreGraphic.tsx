@@ -1,9 +1,11 @@
 import { useId } from "react";
+import { PIED_HAUTEUR_CM, PIED_SECTION_CM } from "@/lib/carres";
 
 const W = 240, H = 160;
 const PAD = { l: 30, r: 34, t: 10, b: 22 };
 const KX = 0.5, KY = 0.32; // inclinaison de la largeur (projection oblique)
 const PLANCHE_CM = 15; // hauteur d'une planche, pour le dessin du bois
+const EPAISSEUR_CM = 2.1; // épaisseur des planches du cadre
 
 const cm = (n: number) => `${Number(n.toFixed(1))} cm`;
 type Pt = [number, number];
@@ -15,9 +17,9 @@ const poly = (pts: Pt[]) => pts.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)
  * Composant sans état, prévu pour être réutilisé (ex. vue potager).
  */
 export default function CarreGraphic({
-  longueur, largeur, hauteur, className = "w-full",
+  longueur, largeur, hauteur, pieds = false, className = "w-full",
 }: {
-  longueur: number | null; largeur: number | null; hauteur: number | null; className?: string;
+  longueur: number | null; largeur: number | null; hauteur: number | null; pieds?: boolean; className?: string;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   if (!longueur || !largeur) {
@@ -28,12 +30,14 @@ export default function CarreGraphic({
     );
   }
   const h = hauteur ?? 0;
-  const ext = { x: longueur + largeur * KX, y: h + largeur * KY };
+  const lp = pieds ? PIED_HAUTEUR_CM : 0; // hauteur des pieds
+  const ext = { x: longueur + largeur * KX, y: h + lp + largeur * KY };
   const aw = W - PAD.l - PAD.r, ah = H - PAD.t - PAD.b;
   const s = Math.min(aw / ext.x, ah / ext.y);
   const x0 = PAD.l + (aw - ext.x * s) / 2;
-  const yb = PAD.t + (ah + ext.y * s) / 2; // bas de la face avant
-  const L = longueur * s, D = largeur * s, Hh = h * s;
+  const yg = PAD.t + (ah + ext.y * s) / 2; // sol, devant
+  const L = longueur * s, D = largeur * s, Hh = h * s, Lp = lp * s;
+  const yb = yg - Lp; // bas de la face avant du cadre
   const dx = D * KX, dy = D * KY;
   const yt = yb - Hh; // niveau du dessus du cadre
 
@@ -41,9 +45,9 @@ export default function CarreGraphic({
   const top = (u: number, v: number): Pt => [x0 + u + v * KX, yt - v * KY];
 
   // Épaisseur du cadre (≈ 3 cm), terre légèrement en contrebas
-  // t : épaisseur apparente du rebord ; en profondeur (v) elle est divisée par KY pour que
-  // les rebords avant/arrière paraissent aussi épais que ceux de gauche/droite.
-  const t = Math.max(2.5, Math.min(5, 3 * s, L / 4, (D * KY) / 3));
+  // t : épaisseur des planches (2,1 cm, à l'échelle), identique sur les quatre côtés ; en profondeur (v)
+  // elle est divisée par KY pour que les rebords avant/arrière paraissent aussi épais que ceux de gauche/droite.
+  const t = Math.min(Math.max(EPAISSEUR_CM * s, 1.2), L / 4, (D * KY) / 3);
   const tv = t / KY;
   const creux = h > 0 ? Math.min(Hh * 0.25, 7) : 0;
   const soil = (pts: Pt[]) => pts.map(([x, y]) => [x, y + creux] as Pt);
@@ -60,7 +64,18 @@ export default function CarreGraphic({
   const n = h > 0 ? Math.min(8, Math.max(1, Math.round(h / PLANCHE_CM))) : 0;
   const joints = Array.from({ length: n - 1 }, (_, i) => (i + 1) / n);
 
-  const ombre: Pt[] = [[x0 + 4, yb + 2], [x0 + L + 4, yb + 2], [x0 + L + dx + 7, yb - dy + 3], [x0 + dx + 6, yb - dy + 3]];
+  const ombre: Pt[] = [[x0 + 4, yg + 2], [x0 + L + 4, yg + 2], [x0 + L + dx + 7, yg - dy + 3], [x0 + dx + 6, yg - dy + 3]];
+
+  // Pieds : quatre poteaux carrés aux coins, du fond vers l'avant
+  const a = Math.min(Math.max(PIED_SECTION_CM * s, 2), L / 3, D / 3);
+  const sol = (u: number, v: number): Pt => [x0 + u + v * KX, yg - v * KY];
+  const poteaux = pieds
+    ? [[0, D - a], [L - a, D - a], [0, 0], [L - a, 0]].map(([u, v]) => {
+        const p0 = sol(u, v), p1 = sol(u + a, v), p2 = sol(u + a, v + a);
+        const up = (p: Pt): Pt => [p[0], p[1] - Lp];
+        return { avant: [p0, p1, up(p1), up(p0)] as Pt[], droite: [p1, p2, up(p2), up(p1)] as Pt[] };
+      })
+    : [];
   const f = (name: string) => `url(#${name}${uid})`;
   const label = "fill-muted text-[10px]";
 
@@ -107,10 +122,21 @@ export default function CarreGraphic({
 
       {/* Sol herbeux et ombre portée */}
       <g clipPath={`url(#clipHerbe${uid})`}>
-        <ellipse cx={x0 + (L + dx) / 2} cy={yb - dy / 2 + 2} rx={Math.min(W / 2, (L + dx) / 2 + 28)} ry={Math.min(H / 2, dy / 2 + 22)} fill={`url(#sol${uid})`} />
-        <ellipse cx={x0 + (L + dx) / 2} cy={yb - dy / 2 + 2} rx={Math.min(W / 2, (L + dx) / 2 + 28)} ry={Math.min(H / 2, dy / 2 + 22)} fill="#fff" filter={f("herbe")} opacity="0.35" />
+        <ellipse cx={x0 + (L + dx) / 2} cy={yg - dy / 2 + 2} rx={Math.min(W / 2, (L + dx) / 2 + 28)} ry={Math.min(H / 2, dy / 2 + 22)} fill={`url(#sol${uid})`} />
+        <ellipse cx={x0 + (L + dx) / 2} cy={yg - dy / 2 + 2} rx={Math.min(W / 2, (L + dx) / 2 + 28)} ry={Math.min(H / 2, dy / 2 + 22)} fill="#fff" filter={f("herbe")} opacity="0.35" />
       </g>
       <polygon points={poly(ombre)} fill="#000" opacity="0.4" filter={f("flou")} />
+
+      {poteaux.map((p, i) => (
+        <g key={i}>
+          <polygon points={poly(p.avant)} fill="#b98348" />
+          <polygon points={poly(p.avant)} fill="#fff" filter={f("grain")} />
+          <polygon points={poly(p.droite)} fill="#7d4f27" />
+          <polygon points={poly(p.droite)} fill="#fff" filter={f("grain")} />
+          <polygon points={poly(p.avant)} fill="none" stroke="#3a210d" strokeOpacity="0.7" strokeWidth={0.7} strokeLinejoin="round" />
+          <polygon points={poly(p.droite)} fill="none" stroke="#3a210d" strokeOpacity="0.7" strokeWidth={0.7} strokeLinejoin="round" />
+        </g>
+      ))}
 
       {h > 0 && (
         <>
@@ -154,7 +180,7 @@ export default function CarreGraphic({
       </g>
 
       {/* Cotes */}
-      <text x={x0 + L / 2} y={yb + 14} textAnchor="middle" className={label}>{cm(longueur)}</text>
+      <text x={x0 + L / 2} y={yg + 14} textAnchor="middle" className={label}>{cm(longueur)}</text>
       <text x={x0 + L + dx + 4} y={yt - dy / 2 + 3} className={label}>{cm(largeur)}</text>
       {h > 0 && <text x={x0 - 4} y={yb - Hh / 2 + 3} textAnchor="end" className={label}>{cm(h)}</text>}
     </svg>

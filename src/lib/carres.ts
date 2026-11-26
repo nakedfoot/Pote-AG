@@ -1,3 +1,7 @@
+/** Pieds optionnels aux quatre coins : section carrée et hauteur, en cm. */
+export const PIED_SECTION_CM = 7;
+export const PIED_HAUTEUR_CM = 20;
+
 const fmt = (n: number) => String(Number(n.toFixed(1))).replace(".", ",");
 
 /** « 120 × 80 × 30 cm » (les dimensions absentes sont ignorées) ; null si aucune. */

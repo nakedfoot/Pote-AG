@@ -7,6 +7,8 @@ export type Carre = {
   id: number; zone_id: number; nom: string; dimensions: string | null; exposition: string | null;
   /** Dimensions en cm : longueur, largeur, hauteur du cadre */
   longueur_cm: number | null; largeur_cm: number | null; hauteur_cm: number | null;
+  /** 1 si le carré repose sur quatre pieds */
+  pieds: number;
 };
 export type Plant = {
   id: number; carre_id: number | null; nom: string; variete: string | null; photo: string | null;

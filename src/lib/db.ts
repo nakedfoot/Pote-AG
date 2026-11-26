@@ -133,6 +133,8 @@ const MIGRATIONS: string[] = [
   ALTER TABLE carre ADD COLUMN largeur_cm REAL;
   ALTER TABLE carre ADD COLUMN hauteur_cm REAL;
   `,
+  // v7 : pieds optionnels aux quatre coins du carré
+  `ALTER TABLE carre ADD COLUMN pieds INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };
