@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { deleteZone, saveZone } from "@/app/actions/garden";
 import CarreGraphic from "@/components/CarreGraphic";
+import Zoomable from "@/components/Zoomable";
 import { formatDimensions } from "@/lib/carres";
 import { plantsParCarre } from "@/lib/carre-plants";
 import { listCarres, listZones } from "@/lib/queries";
@@ -32,8 +33,8 @@ export default async function ZonesPage() {
         {zones.map((z) => {
           const mine = carres.filter((c) => c.zone_id === z.id);
           return (
-            <section key={z.id} className="card flex flex-col gap-4 border-l-4" style={{ borderLeftColor: z.couleur }}>
-              <div className="flex flex-wrap items-center gap-2">
+            <Zoomable key={z.id} className="card flex flex-col gap-4 border-l-4" style={{ borderLeftColor: z.couleur }}>
+              <div className="flex flex-wrap items-center gap-2 pr-9">
                 <form action={saveZone} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                   <input type="hidden" name="id" value={z.id} />
                   <input type="color" name="couleur" defaultValue={z.couleur} className="h-9 w-12 rounded" aria-label="Couleur" />
@@ -68,7 +69,7 @@ export default async function ZonesPage() {
                   ))}
                 </div>
               )}
-            </section>
+            </Zoomable>
           );
         })}
       </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placerPlant } from "@/app/actions/plan";
 import CarreDessus from "@/components/CarreDessus";
+import Zoomable from "@/components/Zoomable";
 import {
   DEFAUT_CARRE_CM, EPAISSEUR_CM, UNITES_MAX_DESSUS, ZONE_MIN, dimsGrille, formatDimensions, grille, tailleZoneDefaut,
 } from "@/lib/carres";
@@ -285,8 +286,8 @@ export default function PotagerBoard({ carres, plants }: { carres: BoardCarre[];
                   const dedans = plants.filter((p) => pos[p.id]?.carreId === c.id);
                   const s = sol(c);
                   return (
-                    <div key={c.id} className="card space-y-2">
-                      <div className="flex items-baseline justify-between gap-2">
+                    <Zoomable key={c.id} className="card space-y-2">
+                      <div className="flex items-baseline justify-between gap-2 pr-9">
                         <h3 className="truncate font-medium">{c.nom}</h3>
                         <span className="shrink-0 text-xs text-muted">🌱 {dedans.length}</span>
                       </div>
@@ -339,7 +340,7 @@ export default function PotagerBoard({ carres, plants }: { carres: BoardCarre[];
                       <p className="text-xs text-muted">
                         {formatDimensions(c.longueur, c.largeur, c.hauteur) ?? "Dimensions non renseignées (carré supposé de 120 × 120 cm)"}
                       </p>
-                    </div>
+                    </Zoomable>
                   );
                 })}
               </div>

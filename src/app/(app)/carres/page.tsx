@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { deleteCarre, saveCarre } from "@/app/actions/garden";
 import CarreGraphic from "@/components/CarreGraphic";
+import Zoomable from "@/components/Zoomable";
 import { PIED_HAUTEUR_CM, PIED_SECTION_CM, formatDimensions, parseAncienneDimension, surfaceM2 } from "@/lib/carres";
 import { plantsParCarre } from "@/lib/carre-plants";
 import { listCarres, listZones } from "@/lib/queries";
@@ -42,8 +43,8 @@ export default async function CarresPage() {
           const largeur = c.largeur_cm ?? ancien?.largeur ?? null;
           const surface = surfaceM2(longueur, largeur);
           return (
-            <div key={c.id} className="card flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-2">
+            <Zoomable key={c.id} className="card flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-2 pr-9">
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold">{c.nom}</h2>
                   <p className="truncate text-xs text-muted">📍 {c.zone_nom}</p>
@@ -70,7 +71,7 @@ export default async function CarresPage() {
                   <button className="btn-danger w-full">Supprimer</button>
                 </form>
               </details>
-            </div>
+            </Zoomable>
           );
         })}
       </div>

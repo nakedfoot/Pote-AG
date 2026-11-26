@@ -29,7 +29,7 @@ export default function CarreDessus({
     <div
       data-carre-box={carreId}
       className={`relative mx-auto select-none ${className}`}
-      style={{ aspectRatio: `${L} / ${Wd}`, width: `min(100%, ${(L / Wd) * HAUTEUR_MAX_REM}rem)` }}
+      style={{ aspectRatio: `${L} / ${Wd}`, width: `min(100%, calc(${(L / Wd) * HAUTEUR_MAX_REM}rem * var(--zoom, 1)))` }}
     >
       <svg viewBox={`0 0 ${vw} ${vh}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full drop-shadow-md" aria-hidden>
         <defs>
