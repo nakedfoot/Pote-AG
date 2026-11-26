@@ -30,6 +30,8 @@ export type Plant = {
   sources_data: string | null;
   /** Position dans le carré (fractions 0..1 de la terre) ; null = disposition automatique */
   plan_x: number | null; plan_y: number | null;
+  /** Forme dessinée dans le carré (clé de TYPES_PLANTE) ; null = déduite du nom */
+  type_plante: string | null;
 };
 export type PlantRow = Plant & { carre_nom: string | null; zone_id: number | null; zone_nom: string | null };
 export type Evenement = { id: number; plant_id: number; type: string; date: string; commentaire: string | null };

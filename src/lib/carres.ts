@@ -1,6 +1,8 @@
 /** Pieds optionnels aux quatre coins : section carrée et hauteur, en cm. */
 export const PIED_SECTION_CM = 7;
 export const PIED_HAUTEUR_CM = 20;
+/** Dimensions supposées d'un carré dont la longueur ou la largeur n'est pas renseignée (cm). */
+export const DEFAUT_CARRE_CM = 120;
 /** Épaisseur des planches du cadre, en cm. */
 export const EPAISSEUR_CM = 2.1;
 
@@ -30,4 +32,45 @@ export function parseAncienneDimension(txt: string | null): { longueur: number; 
   const enMetres = m[3] === "m" || (!m[3] && Math.max(a, b) < 10);
   const k = enMetres ? 100 : 1;
   return { longueur: Math.round(a * k), largeur: Math.round(b * k) };
+}
+
+// ---------- Plants représentés dans le carré ----------
+
+/** Forme de la plante, pour son dessin dans le carré. */
+export const TYPES_PLANTE = {
+  herbacee: "Légume, aromatique, herbacée",
+  fleur: "Fleur",
+  arbuste: "Arbuste",
+  arbre: "Arbre",
+  grimpante: "Grimpante",
+} as const;
+export type TypePlante = keyof typeof TYPES_PLANTE;
+export const estTypePlante = (v: unknown): v is TypePlante => typeof v === "string" && v in TYPES_PLANTE;
+
+/** Hauteur dessinée quand le plant n'a aucune hauteur mesurée. */
+export const HAUTEUR_DEFAUT_CM = 15;
+
+/** Plant tel que dessiné dans un carré : position (fractions 0..1 de la terre, y = 0 au fond), forme, hauteur en cm. */
+export type PlantDessin = { id: number; nom: string; x: number; y: number; type: TypePlante; hauteur: number; espacement: number | null };
+
+const sansAccent = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const MOTS: [TypePlante, RegExp][] = [
+  ["arbre", /pommier|poirier|cerisier|prunier|olivier|figuier|abricotier|pecher|oranger|citronnier|noyer|chene|erable|chataignier|amandier|mirabellier|cognassier|\barbre\b/],
+  ["grimpante", /vigne|clematite|lierre|kiwi|pois de senteur|chevrefeuille|houblon|glycine|jasmin|liseron|grimpant/],
+  ["arbuste", /framboisier|groseillier|cassis|cassissier|myrtille|rosier|buis|noisetier|romarin|hortensia|lilas|laurier|forsythia|arbuste|murier/],
+  ["fleur", /\brose\b|tulipe|lavande|tournesol|pivoine|dahlia|oeillet|capucine|souci|bleuet|pensee|\blys\b|iris|geranium|marguerite|narcisse|jonquille|cosmos|zinnia|petunia|primevere|fleur/],
+];
+
+/** Forme probable d'après le nom (et le nom scientifique) ; une hauteur adulte d'au moins 4 m évoque un arbre. */
+export function devinerType(nom: string, nomScientifique: string | null, hauteurAdulteCm: number | null): TypePlante {
+  const t = sansAccent(`${nom} ${nomScientifique ?? ""}`);
+  for (const [type, re] of MOTS) if (re.test(t)) return type;
+  return hauteurAdulteCm !== null && hauteurAdulteCm >= 400 ? "arbre" : "herbacee";
+}
+
+/** Grille régulière de `n` positions (fractions 0..1) dans un rectangle de proportions `ratio` = longueur / largeur. */
+export function grille(n: number, ratio: number): { x: number; y: number }[] {
+  const cols = Math.max(1, Math.ceil(Math.sqrt(n * ratio)));
+  const rows = Math.ceil(n / cols);
+  return Array.from({ length: n }, (_, i) => ({ x: ((i % cols) + 0.5) / cols, y: (Math.floor(i / cols) + 0.5) / rows }));
 }

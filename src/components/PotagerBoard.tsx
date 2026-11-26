@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { placerPlant } from "@/app/actions/plan";
 import CarreDessus from "@/components/CarreDessus";
-import { EPAISSEUR_CM, formatDimensions } from "@/lib/carres";
+import { DEFAUT_CARRE_CM, EPAISSEUR_CM, formatDimensions, grille } from "@/lib/carres";
 
 export type Etat = "ok" | "bas" | "haut" | "inconnu";
 export type BoardCarre = {
@@ -23,7 +23,6 @@ type Drag = { id: number; sx: number; sy: number; x: number; y: number; moved: b
 
 const COULEUR: Record<Etat, string> = { ok: "#16a34a", bas: "#f59e0b", haut: "#dc2626", inconnu: "#9ca3af" };
 const clamp = (n: number) => Math.min(1, Math.max(0, n));
-const DEFAUT_CM = 120;
 
 /** Positions de départ : celles enregistrées, sinon une grille régulière dans le carré. */
 function initiales(plants: BoardPlant[], carres: BoardCarre[]): Record<number, Pos> {
@@ -36,11 +35,9 @@ function initiales(plants: BoardPlant[], carres: BoardCarre[]): Record<number, P
   }
   for (const [cid, list] of sans) {
     const c = carres.find((x) => x.id === cid);
-    const ratio = (c?.longueur ?? DEFAUT_CM) / (c?.largeur ?? DEFAUT_CM);
-    const cols = Math.max(1, Math.ceil(Math.sqrt(list.length * ratio)));
-    const rows = Math.ceil(list.length / cols);
+    const pts = grille(list.length, (c?.longueur ?? DEFAUT_CARRE_CM) / (c?.largeur ?? DEFAUT_CARRE_CM));
     list.forEach((p, i) => {
-      out[p.id] = { carreId: cid, x: ((i % cols) + 0.5) / cols, y: (Math.floor(i / cols) + 0.5) / rows };
+      out[p.id] = { carreId: cid, ...pts[i] };
     });
   }
   return out;
@@ -211,7 +208,7 @@ export default function PotagerBoard({ carres, plants }: { carres: BoardCarre[];
               <div className="grid grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))] gap-4">
                 {z.carres.map((c) => {
                   const dedans = plants.filter((p) => pos[p.id]?.carreId === c.id);
-                  const solCm = (c.longueur ?? DEFAUT_CM) - 2 * EPAISSEUR_CM;
+                  const solCm = (c.longueur ?? DEFAUT_CARRE_CM) - 2 * EPAISSEUR_CM;
                   return (
                     <div key={c.id} className="card space-y-2">
                       <div className="flex items-baseline justify-between gap-2">

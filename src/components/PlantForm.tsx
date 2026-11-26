@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { savePlant } from "@/app/actions/garden";
 import Calendrier from "@/components/Calendrier";
+import { TYPES_PLANTE } from "@/lib/carres";
 import {
   CARAC_KEYS, CARACS, FIELD_KEYS, MOIS_COLS, PROVIDERS, parseMois, parseSourcesData, versTexte,
   type FieldKey, type Fiche, type ProviderId, type SourcesData,
@@ -259,6 +260,13 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
           <div><label className="label">Date de semis</label><input type="date" name="date_semis" defaultValue={d(plant?.date_semis)} className="input" /></div>
           <div><label className="label">Date de plantation</label><input type="date" name="date_plantation" defaultValue={plant ? d(plant.date_plantation) : today} className="input" /></div>
           <div><label className="label">Récolte prévue</label><input type="date" name="date_recolte_prevue" defaultValue={d(plant?.date_recolte_prevue)} className="input" /></div>
+        </div>
+        <div>
+          <label className="label">Type de plante <span className="font-normal text-muted">(forme dessinée dans le carré)</span></label>
+          <select name="type_plante" defaultValue={plant?.type_plante ?? ""} className="input">
+            <option value="">Automatique (d&apos;après le nom)</option>
+            {Object.entries(TYPES_PLANTE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>

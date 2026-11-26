@@ -2,6 +2,7 @@ import Link from "next/link";
 import { deleteZone, saveZone } from "@/app/actions/garden";
 import CarreGraphic from "@/components/CarreGraphic";
 import { formatDimensions } from "@/lib/carres";
+import { plantsParCarre } from "@/lib/carre-plants";
 import { listCarres, listZones } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ZonesPage() {
   const zones = listZones();
   const carres = listCarres();
+  const plants = plantsParCarre(carres);
   return (
     <div className="max-w-6xl space-y-6">
       <h1 className="text-2xl font-semibold">📍 Zones</h1>
@@ -56,7 +58,7 @@ export default async function ZonesPage() {
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(min(11rem,100%),1fr))] gap-3">
                   {mine.map((c) => (
                     <Link key={c.id} href="/carres" className="flex flex-col gap-1 rounded-lg border border-border p-2 transition hover:shadow-md">
-                      <CarreGraphic longueur={c.longueur_cm} largeur={c.largeur_cm} hauteur={c.hauteur_cm} pieds={c.pieds === 1} />
+                      <CarreGraphic longueur={c.longueur_cm} largeur={c.largeur_cm} hauteur={c.hauteur_cm} pieds={c.pieds === 1} plants={plants.get(c.id)} />
                       <div className="flex items-center justify-between gap-2 text-sm">
                         <span className="truncate font-medium">{c.nom}</span>
                         <span className="shrink-0 text-xs text-muted">🌱 {c.nb_plants}</span>

@@ -9,7 +9,7 @@ import { removePlantNow, snapshotLive, syncAllNow, syncPlantNow } from "@/lib/mq
 import { copyUpload, deleteUpload, saveUpload } from "@/lib/image";
 import { FIELD_KEYS, formatMois, MOIS_COLS, NUMBER_FIELDS, parseMois, parseSourcesData } from "@/lib/botanique";
 import { METRIC_KEYS } from "@/lib/metrics";
-import { formatDimensions } from "@/lib/carres";
+import { estTypePlante, formatDimensions } from "@/lib/carres";
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const nul = (v: string) => (v === "" ? null : v);
@@ -98,6 +98,7 @@ export async function savePlant(formData: FormData) {
     date_recolte_prevue: nul(s(formData, "date_recolte_prevue")),
     statut: s(formData, "statut") || "croissance",
     notes: nul(s(formData, "notes")),
+    type_plante: estTypePlante(s(formData, "type_plante")) ? s(formData, "type_plante") : null,
     ...botanique,
     sources_data: JSON.stringify(sources),
   };

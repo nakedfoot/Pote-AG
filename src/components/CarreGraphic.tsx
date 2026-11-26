@@ -1,10 +1,12 @@
 import { useId } from "react";
-import { EPAISSEUR_CM, PIED_HAUTEUR_CM, PIED_SECTION_CM } from "@/lib/carres";
+import Plante3D from "@/components/Plante3D";
+import { EPAISSEUR_CM, PIED_HAUTEUR_CM, PIED_SECTION_CM, type PlantDessin } from "@/lib/carres";
 
 const W = 240, H = 160;
 const PAD = { l: 30, r: 34, t: 10, b: 22 };
 const KX = 0.5, KY = 0.32; // inclinaison de la largeur (projection oblique)
 const PLANCHE_CM = 15; // hauteur d'une planche, pour le dessin du bois
+const PLANTE_MAX_CM = 250; // hauteur maximale dessinée, pour que le carré reste lisible
 
 const cm = (n: number) => `${Number(n.toFixed(1))} cm`;
 type Pt = [number, number];
@@ -16,9 +18,9 @@ const poly = (pts: Pt[]) => pts.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)
  * Composant sans état, prévu pour être réutilisé (ex. vue potager).
  */
 export default function CarreGraphic({
-  longueur, largeur, hauteur, pieds = false, className = "w-full",
+  longueur, largeur, hauteur, pieds = false, plants = [], className = "w-full",
 }: {
-  longueur: number | null; largeur: number | null; hauteur: number | null; pieds?: boolean; className?: string;
+  longueur: number | null; largeur: number | null; hauteur: number | null; pieds?: boolean; plants?: PlantDessin[]; className?: string;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   if (!longueur || !largeur) {
@@ -30,7 +32,10 @@ export default function CarreGraphic({
   }
   const h = hauteur ?? 0;
   const lp = pieds ? PIED_HAUTEUR_CM : 0; // hauteur des pieds
-  const ext = { x: longueur + largeur * KX, y: h + lp + largeur * KY };
+  // Plants : y = 0 au fond du carré ; la hauteur dépasse du carré, on la compte dans l'emprise du dessin
+  const pl = plants.map((p) => ({ ...p, hc: Math.min(PLANTE_MAX_CM, Math.max(4, p.hauteur)) }));
+  const haut = pl.reduce((m, p) => Math.max(m, (1 - p.y) * largeur * KY + p.hc), largeur * KY);
+  const ext = { x: longueur + largeur * KX, y: h + lp + haut };
   const aw = W - PAD.l - PAD.r, ah = H - PAD.t - PAD.b;
   const s = Math.min(aw / ext.x, ah / ext.y);
   const x0 = PAD.l + (aw - ext.x * s) / 2;
@@ -63,6 +68,16 @@ export default function CarreGraphic({
   // Joints entre planches
   const n = h > 0 ? Math.min(8, Math.max(1, Math.round(h / PLANCHE_CM))) : 0;
   const joints = Array.from({ length: n - 1 }, (_, i) => (i + 1) / n);
+
+  // Plants posés sur la terre (du fond vers l'avant), masqués par la planche avant sous le niveau du rebord
+  const lTerre = L - 2 * t, dTerre = D - 2 * tv;
+  const rendus = [...pl]
+    .sort((a, b) => a.y - b.y)
+    .map((p) => {
+      const [bx, by] = top(t + p.x * lTerre, tv + (1 - p.y) * dTerre);
+      return { p, bx, by: by + creux };
+    });
+  const yRebordAvant = top(0, tv)[1];
 
   const ombre: Pt[] = [[x0 + 4, yg + 2], [x0 + L + 4, yg + 2], [x0 + L + dx + 7, yg - dy + 3], [x0 + dx + 6, yg - dy + 3]];
 
@@ -117,6 +132,10 @@ export default function CarreGraphic({
           <stop offset="0" stopColor="#6aa84f" stopOpacity="0.55" /><stop offset="1" stopColor="#6aa84f" stopOpacity="0" />
         </radialGradient>
         <clipPath id={`ouv${uid}`}><polygon points={poly(inner)} /></clipPath>
+        <radialGradient id={`leafL${uid}`} cx="0.35" cy="0.3" r="0.8"><stop offset="0" stopColor="#8ed45a" /><stop offset="1" stopColor="#3f8f2e" /></radialGradient>
+        <radialGradient id={`leafD${uid}`} cx="0.35" cy="0.3" r="0.8"><stop offset="0" stopColor="#58a83c" /><stop offset="1" stopColor="#2a6a22" /></radialGradient>
+        <linearGradient id={`trunk${uid}`} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8a5d36" /><stop offset="1" stopColor="#4e331c" /></linearGradient>
+        <clipPath id={`plantes${uid}`}><rect x="0" y="0" width={W} height={Math.max(0, yRebordAvant)} /></clipPath>
         <clipPath id={`clipHerbe${uid}`}><rect x="0" y="0" width={W} height={H} /></clipPath>
       </defs>
 
@@ -178,6 +197,15 @@ export default function CarreGraphic({
       <polygon points={poly(terre)} fill={`url(#ombreTerre${uid})`} />
       <polygon points={poly(terre)} fill="none" stroke="#1a0f06" strokeOpacity="0.5" strokeWidth={0.6} />
       </g>
+
+      {/* Plants */}
+      {rendus.length > 0 && (
+        <g clipPath={f("plantes")}>
+          {rendus.map(({ p, bx, by }) => (
+            <Plante3D key={p.id} type={p.type} x={bx} y={by} hcm={p.hc} esp={p.espacement} s={s} id={p.id} uid={uid} />
+          ))}
+        </g>
+      )}
 
       {/* Cotes */}
       <text x={x0 + L / 2} y={yg + 14} textAnchor="middle" className={label}>{cm(longueur)}</text>

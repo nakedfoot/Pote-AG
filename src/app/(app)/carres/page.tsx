@@ -2,6 +2,7 @@ import Link from "next/link";
 import { deleteCarre, saveCarre } from "@/app/actions/garden";
 import CarreGraphic from "@/components/CarreGraphic";
 import { PIED_HAUTEUR_CM, PIED_SECTION_CM, formatDimensions, parseAncienneDimension, surfaceM2 } from "@/lib/carres";
+import { plantsParCarre } from "@/lib/carre-plants";
 import { listCarres, listZones } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function CarresPage() {
   const zones = listZones();
   const carres = listCarres();
+  const plants = plantsParCarre(carres);
   if (zones.length === 0) {
     return (
       <div className="max-w-3xl space-y-4">
@@ -48,7 +50,7 @@ export default async function CarresPage() {
                 </div>
                 <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-xs dark:bg-white/10">🌱 {c.nb_plants}</span>
               </div>
-              <CarreGraphic longueur={longueur} largeur={largeur} hauteur={c.hauteur_cm} pieds={c.pieds === 1} />
+              <CarreGraphic longueur={longueur} largeur={largeur} hauteur={c.hauteur_cm} pieds={c.pieds === 1} plants={plants.get(c.id)} />
               <p className="text-xs text-muted">
                 {formatDimensions(longueur, largeur, c.hauteur_cm) ?? "Dimensions non renseignées"}
                 {surface !== null && ` · ${Number(surface.toFixed(2))} m²`}
