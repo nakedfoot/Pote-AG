@@ -34,6 +34,12 @@ export const listCarres = () =>
   );
 export const getPlant = (id: number) => get<PlantRow>(PLANT_SQL + " WHERE p.id = ?", id);
 export const listPlants = () => all<PlantRow>(PLANT_SQL + " ORDER BY z.nom, c.nom, p.nom");
+export type Hauteur = { id: number; plant_id: number; date: string; hauteur_cm: number; commentaire: string | null };
+/** Historique des hauteurs mesurées, de la plus récente à la plus ancienne. */
+export const listHauteurs = (plantId: number) =>
+  all<Hauteur>("SELECT * FROM plant_hauteur WHERE plant_id = ? ORDER BY date DESC, id DESC", plantId);
+export const derniereHauteur = (plantId: number) =>
+  get<Hauteur>("SELECT * FROM plant_hauteur WHERE plant_id = ? ORDER BY date DESC, id DESC LIMIT 1", plantId);
 export const listEvenements = (plantId: number) =>
   all<Evenement>("SELECT * FROM evenement WHERE plant_id = ? ORDER BY date DESC, id DESC", plantId);
 

@@ -21,6 +21,8 @@ type Props = {
   hasSources: boolean;
   /** Associations existantes : métrique -> "capteurId|champ" */
   assoc: Partial<Record<MetricKey, string>>;
+  /** Dernière hauteur mesurée (cm) */
+  hauteurActuelle?: number | null;
 };
 
 /** Réponse de /api/plantes (fiche fusionnée selon l'ordre de priorité des sources). */
@@ -35,7 +37,7 @@ type Collecte = {
 
 const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export default function PlantForm({ plant, zones, carres, hasSources, assoc }: Props) {
+export default function PlantForm({ plant, zones, carres, hasSources, assoc, hauteurActuelle }: Props) {
   const today = new Date().toISOString().slice(0, 10);
   const [initial] = useState(() => parseSourcesData(plant?.sources_data));
   const [nom, setNom] = useState(plant?.nom ?? "");
@@ -258,11 +260,18 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc }: P
           <div><label className="label">Date de plantation</label><input type="date" name="date_plantation" defaultValue={plant ? d(plant.date_plantation) : today} className="input" /></div>
           <div><label className="label">Récolte prévue</label><input type="date" name="date_recolte_prevue" defaultValue={d(plant?.date_recolte_prevue)} className="input" /></div>
         </div>
-        <div>
-          <label className="label">Stade</label>
-          <select name="statut" defaultValue={plant?.statut ?? "croissance"} className="input max-w-xs">
-            {Object.entries(STATUTS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Stade</label>
+            <select name="statut" defaultValue={plant?.statut ?? "croissance"} className="input">
+              {Object.entries(STATUTS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Hauteur du plant (cm)</label>
+            <input name="hauteur_actuelle" type="number" step="any" min="0" defaultValue={hauteurActuelle ?? ""} className="input" placeholder="mesure du jour" />
+            <p className="mt-1 text-xs text-muted">Une modification est ajoutée à l&apos;historique (onglet « Hauteur »).</p>
+          </div>
         </div>
       </section>
 

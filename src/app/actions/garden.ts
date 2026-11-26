@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { get, run } from "@/lib/db";
+import { derniereHauteur } from "@/lib/queries";
 import { removePlantNow, snapshotLive, syncAllNow, syncPlantNow } from "@/lib/mqtt-service";
 import { copyUpload, deleteUpload, saveUpload } from "@/lib/image";
 import { FIELD_KEYS, formatMois, MOIS_COLS, NUMBER_FIELDS, parseMois, parseSourcesData } from "@/lib/botanique";
@@ -126,8 +127,38 @@ export async function savePlant(formData: FormData) {
     run("INSERT INTO plant_capteur (plant_id, capteur_id, metrique, champ) VALUES (?, ?, ?, ?)", plantId, Number(cid), k, champ);
     snapshotLive(Number(cid), champ);
   }
+  // Hauteur mesurée : une nouvelle entrée d'historique si la valeur a changé
+  const hauteur = num(formData, "hauteur_actuelle");
+  if (hauteur !== null && hauteur > 0 && derniereHauteur(plantId)?.hauteur_cm !== hauteur) {
+    run("INSERT INTO plant_hauteur (plant_id, date, hauteur_cm) VALUES (?, ?, ?)", plantId, new Date().toISOString().slice(0, 10), hauteur);
+  }
   syncPlantNow(plantId);
   redirect(`/plants/${plantId}`);
+}
+
+export async function addHauteur(formData: FormData) {
+  await requireUser();
+  const plantId = Number(formData.get("plant_id"));
+  const cm = num(formData, "hauteur_cm");
+  if (cm !== null && cm > 0 && get("SELECT 1 FROM plant WHERE id = ?", plantId)) {
+    run(
+      "INSERT INTO plant_hauteur (plant_id, date, hauteur_cm, commentaire) VALUES (?, ?, ?, ?)",
+      plantId,
+      s(formData, "date") || new Date().toISOString().slice(0, 10),
+      cm,
+      nul(s(formData, "commentaire")),
+    );
+    syncPlantNow(plantId);
+  }
+  redirect(`/plants/${plantId}?tab=hauteur`);
+}
+
+export async function deleteHauteur(formData: FormData) {
+  await requireUser();
+  const plantId = Number(formData.get("plant_id"));
+  run("DELETE FROM plant_hauteur WHERE id = ? AND plant_id = ?", Number(formData.get("id")), plantId);
+  syncPlantNow(plantId);
+  redirect(`/plants/${plantId}?tab=hauteur`);
 }
 
 export async function deletePlant(formData: FormData) {

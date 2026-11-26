@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import PlantForm from "@/components/PlantForm";
-import { getPlant, listCarres, listZones, plantAssoc } from "@/lib/queries";
+import { derniereHauteur, getPlant, listCarres, listZones, plantAssoc } from "@/lib/queries";
 import { sourcesActives } from "@/lib/sources";
 
 export default async function EditPlantPage({ params }: PageProps<"/plants/[id]/edit">) {
@@ -10,7 +10,7 @@ export default async function EditPlantPage({ params }: PageProps<"/plants/[id]/
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Modifier « {plant.nom} »</h1>
-      <PlantForm plant={plant} zones={listZones()} carres={listCarres()} hasSources={sourcesActives().length > 0} assoc={plantAssoc(plant.id)} />
+      <PlantForm plant={plant} zones={listZones()} carres={listCarres()} hasSources={sourcesActives().length > 0} assoc={plantAssoc(plant.id)} hauteurActuelle={derniereHauteur(plant.id)?.hauteur_cm ?? null} />
     </div>
   );
 }

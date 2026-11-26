@@ -116,6 +116,17 @@ const MIGRATIONS: string[] = [
   UPDATE plant SET nom_scientifique = json_extract(opb_data, '$.display_pid') WHERE opb_data IS NOT NULL AND json_valid(opb_data);
   CREATE TABLE source_cache (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL, ts INTEGER NOT NULL);
   `,
+  // v5 : hauteur mesurée de chaque plant, avec historique
+  `
+  CREATE TABLE plant_hauteur (
+    id INTEGER PRIMARY KEY,
+    plant_id INTEGER NOT NULL REFERENCES plant(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    hauteur_cm REAL NOT NULL,
+    commentaire TEXT
+  );
+  CREATE INDEX idx_plant_hauteur ON plant_hauteur(plant_id, date);
+  `,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };

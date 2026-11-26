@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addEvenement, affecterPlant, deletePlant, dupliquerPlant } from "@/app/actions/garden";
+import { addEvenement, addHauteur, affecterPlant, deleteHauteur, deletePlant, dupliquerPlant } from "@/app/actions/garden";
 import AutoRefresh from "@/components/AutoRefresh";
 import Calendrier from "@/components/Calendrier";
 import { LineChart, Sparkline } from "@/components/Charts";
 import { CARAC_KEYS, CARACS, MOIS_COLS, PERIODES, PROVIDERS, estVide, parseMois, parseSourcesData, periodesDuMois } from "@/lib/botanique";
 import { isRange, plantMarks, plantSeries, recentSeries, rangeWindow, RANGES, type Range } from "@/lib/history";
 import { METRICS, STATUTS } from "@/lib/metrics";
-import { ageJours, formatDate, getPlant, ilYa, listCarres, listEvenements, listZones, plantStatus, type Plant } from "@/lib/queries";
+import { ageJours, formatDate, getPlant, ilYa, listCarres, listEvenements, listHauteurs, listZones, plantStatus, type Plant } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ const EVT: Record<string, string> = {
   arrosage: "💧 Arrosage", engrais: "🧴 Engrais", taille: "✂️ Taille",
   traitement: "🧪 Traitement", recolte: "🧺 Récolte", note: "📝 Note",
 };
-const TABS = { resume: "Résumé", historique: "Historique", journal: "Journal", fiche: "Fiche OpenPlantbook" } as const;
+const TABS = { resume: "Résumé", historique: "Historique", hauteur: "Hauteur", journal: "Journal", fiche: "Fiche OpenPlantbook" } as const;
 type Tab = keyof typeof TABS;
 
 const OPB_ROWS: [string, string, string, string][] = [
@@ -100,6 +100,7 @@ export default async function PlantPage({ params, searchParams }: PageProps<"/pl
 
       {tab === "resume" && <Resume p={p} status={status} />}
       {tab === "historique" && <Historique p={p} range={range} href={href} />}
+      {tab === "hauteur" && <Hauteur p={p} />}
       {tab === "journal" && <Journal p={p} />}
       {tab === "fiche" && opb && (
         <section className="card space-y-4">
@@ -234,6 +235,66 @@ function Botanique({ p }: { p: PlantFull }) {
         {sd.verifie && <p className="text-xs text-muted">Sources interrogées le {formatDate(sd.verifie)}.</p>}
       </section>
     </>
+  );
+}
+
+function Hauteur({ p }: { p: PlantFull }) {
+  const hist = listHauteurs(p.id); // du plus récent au plus ancien
+  const points = [...hist]
+    .reverse()
+    .map((h) => ({ t: new Date(`${h.date}T12:00:00`).getTime(), v: h.hauteur_cm }))
+    .filter((x) => !Number.isNaN(x.t));
+  const from = points[0]?.t ?? 0;
+  const to = Math.max(points[points.length - 1]?.t ?? 0, from + 3 * 86_400_000);
+  const actuelle = hist[0];
+  const croissance = hist.length > 1 ? hist[0].hauteur_cm - hist[hist.length - 1].hauteur_cm : null;
+  return (
+    <div className="space-y-4">
+      <section className="card space-y-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="text-3xl font-semibold">
+            {actuelle ? actuelle.hauteur_cm : "—"} <span className="text-base font-normal text-muted">cm</span>
+          </div>
+          <div className="text-sm text-muted">
+            {actuelle && `mesuré le ${formatDate(actuelle.date)}`}
+            {croissance !== null && ` · ${croissance >= 0 ? "+" : ""}${Number(croissance.toFixed(1))} cm depuis la première mesure`}
+            {p.hauteur_cm !== null && ` · hauteur adulte de l'espèce : ${p.hauteur_cm} cm`}
+          </div>
+        </div>
+        <form action={addHauteur} className="flex flex-wrap gap-2">
+          <input type="hidden" name="plant_id" value={p.id} />
+          <input type="date" name="date" defaultValue={new Date().toISOString().slice(0, 10)} className="input w-auto" />
+          <input name="hauteur_cm" type="number" step="any" min="0" required placeholder="Hauteur (cm)" className="input w-40" />
+          <input name="commentaire" placeholder="Commentaire (optionnel)" className="input min-w-48 flex-1" />
+          <button className="btn">Ajouter</button>
+        </form>
+      </section>
+      {points.length >= 2 && (
+        <section className="card">
+          <LineChart points={points} from={from} to={to} min={null} max={null} unite="cm" bucketMs={365 * 86_400_000} />
+        </section>
+      )}
+      <section className="card">
+        {hist.length === 0 ? (
+          <p className="text-sm text-muted">Aucune mesure. Ajoutez la première ci-dessus.</p>
+        ) : (
+          <ul className="divide-y divide-border text-sm">
+            {hist.map((h) => (
+              <li key={h.id} className="flex items-center gap-3 py-2">
+                <span className="w-24 shrink-0 text-muted">{formatDate(h.date)}</span>
+                <span className="w-20 shrink-0 font-medium">{h.hauteur_cm} cm</span>
+                <span className="flex-1">{h.commentaire}</span>
+                <form action={deleteHauteur}>
+                  <input type="hidden" name="id" value={h.id} />
+                  <input type="hidden" name="plant_id" value={p.id} />
+                  <button className="text-xs text-muted underline hover:text-red-700">Supprimer</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }
 

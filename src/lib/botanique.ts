@@ -61,7 +61,7 @@ export const CARACS = {
   rusticite: { label: "Rusticité (zones USDA)", type: "text" },
   ph_min: { label: "pH min", type: "number" },
   ph_max: { label: "pH max", type: "number" },
-  hauteur_cm: { label: "Hauteur (cm)", type: "number" },
+  hauteur_cm: { label: "Hauteur adulte de l'espèce (cm)", type: "number" },
   espacement_cm: { label: "Espacement (cm)", type: "number" },
   jours_recolte: { label: "Jours avant récolte", type: "number" },
   comestible: { label: "Parties comestibles", type: "text" },

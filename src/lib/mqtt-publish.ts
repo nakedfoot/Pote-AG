@@ -2,7 +2,7 @@ import { CARAC_KEYS, PERIODE_KEYS, PERIODES, parseMois, parseSourcesData, period
 import { all, get, run } from "./db";
 import { thumbnailBase64 } from "./image";
 import { METRICS, METRIC_KEYS, type MetricKey } from "./metrics";
-import { ageJours, getPlant, listPlants, plantStatus, type PlantRow } from "./queries";
+import { ageJours, derniereHauteur, getPlant, listPlants, plantStatus, type PlantRow } from "./queries";
 import { listRappels } from "./rappels";
 import type { MqttSettings } from "./settings";
 
@@ -66,6 +66,7 @@ export async function buildState(cfg: MqttSettings, p: PlantRow) {
   const calendrier = Object.fromEntries(PERIODE_KEYS.map((k) => [k, parseMois(p[PERIODES[k].col])]));
   const enCours = periodesDuMois(p, new Date().getMonth() + 1);
   const caracteristiques = Object.fromEntries(CARAC_KEYS.map((k) => [k, p[k] ?? null]));
+  const hauteur = derniereHauteur(p.id);
   return {
     plant_id: p.id,
     nom: p.nom,
@@ -87,6 +88,8 @@ export async function buildState(cfg: MqttSettings, p: PlantRow) {
     periodes_en_cours: enCours,
     periode_actuelle: enCours.length ? enCours.map((k) => PERIODES[k].label).join(", ") : null,
     caracteristiques,
+    hauteur_cm: hauteur?.hauteur_cm ?? null,
+    hauteur_date: hauteur?.date ?? null,
     sources: parseSourcesData(p.sources_data).champs,
     mesures,
     alertes,
@@ -170,6 +173,22 @@ function discoveryConfigs(cfg: MqttSettings, p: PlantRow, metriques: MetricKey[]
       json_attributes_topic: st,
       json_attributes_template: "{{ {'calendrier': value_json.calendrier, 'periodes_en_cours': value_json.periodes_en_cours, 'caracteristiques': value_json.caracteristiques} | tojson }}",
       icon: "mdi:calendar-month",
+    },
+  });
+  out.push({
+    topic: t("sensor", "hauteur"),
+    payload: {
+      ...common,
+      name: "Hauteur",
+      unique_id: `${nid}_hauteur`,
+      state_topic: st,
+      value_template: "{{ value_json.hauteur_cm if value_json.hauteur_cm is not none else none }}",
+      unit_of_measurement: "cm",
+      device_class: "distance",
+      state_class: "measurement",
+      json_attributes_topic: st,
+      json_attributes_template: "{{ {'date_mesure': value_json.hauteur_date} | tojson }}",
+      icon: "mdi:human-male-height",
     },
   });
   out.push({
