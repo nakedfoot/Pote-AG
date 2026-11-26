@@ -112,22 +112,26 @@ export function couleurFruit(nom: string, nomScientifique: string | null): strin
   return FRUITS.find(([re]) => re.test(t))?.[1] ?? "#e0432f";
 }
 
+/**
+ * Arbres et arbustes à fleurs bien visibles, avec la couleur de leurs fleurs. Les mois de floraison des sources
+ * (surtout iNaturalist) existent pour presque toutes les plantes, même à fleurs insignifiantes (érable, ficus…) :
+ * on s'appuie donc sur l'espèce. Pour ajouter une espèce, compléter cette liste (noms sans accent).
+ */
 const FLEURS_ARBRES: [RegExp, string][] = [
-  [/rosier|\brose\b/, "#e8457a"],
-  [/lavande/, "#8e6bd1"],
-  [/hortensia/, "#7aa7e8"],
-  [/lilas/, "#b78ad9"],
-  [/forsythia|mimosa|genet/, "#f7d63a"],
-  [/magnolia|cerisier du japon|pecher/, "#f4b6c8"],
-  [/camelia|rhododendron|azalee/, "#e0457f"],
-  [/jasmin|seringat|sureau|aubepine/, "#fbf6ea"],
+  [/rosier|\brose\b|\brosa\b|chaenomeles|cognassier du japon|pyracantha/, "#e8457a"],
+  [/lavande|lavandula|buddleia|buddleja|arbre a papillons|ceanothus|romarin|rosmarinus/, "#8e6bd1"],
+  [/hortensia|hydrangea/, "#7aa7e8"],
+  [/lilas|syringa|lagerstroemia|paulownia|glycine/, "#b78ad9"],
+  [/forsythia|mimosa|genet|cytise|cytisus|spartium|laburnum|mahonia|millepertuis|hypericum/, "#f7d63a"],
+  [/magnolia|cerisier du japon|prunus serrulata|spiree|spiraea|weigela|althea|abelia/, "#f4b6c8"],
+  [/camelia|camellia|rhododendron|azalee|fuchsia|hibiscus|oleandre|laurier rose|nerium/, "#e0457f"],
+  [/jasmin|seringat|philadelphus|sureau|sambucus|aubepine|crataegus|viburnum|deutzia|escallonia|cistus|tilleul|robinier|bruyere|erica|calluna/, "#fbf6ea"],
 ];
-const PASTELS = ["#f9c6d8", "#fbf3df", "#f4a6c1", "#e6d4f5", "#fde68a"];
 
-/** Couleur des fleurs d'un arbre ou arbuste d'après le nom ; une teinte pastel stable sinon. */
-export function couleurFleur(nom: string, nomScientifique: string | null, id: number): string {
+/** Couleur des fleurs d'un arbre ou arbuste à fleurs visibles ; null pour les autres (aucune fleur dessinée). */
+export function couleurFleur(nom: string, nomScientifique: string | null): string | null {
   const t = sansAccent(`${nom} ${nomScientifique ?? ""}`);
-  return FLEURS_ARBRES.find(([re]) => re.test(t))?.[1] ?? PASTELS[id % PASTELS.length];
+  return FLEURS_ARBRES.find(([re]) => re.test(t))?.[1] ?? null;
 }
 
 /** Grille régulière de `n` positions (fractions 0..1) dans un rectangle de proportions `ratio` = longueur / largeur. */

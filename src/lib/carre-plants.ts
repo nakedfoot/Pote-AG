@@ -1,4 +1,3 @@
-import { parseMois } from "./botanique";
 import { DEFAUT_CARRE_CM, HAUTEUR_DEFAUT_CM, couleurFleur, couleurFruit, devinerType, estFruitier, estTypePlante, grille, type PlantDessin } from "./carres";
 import { derniereHauteur, listPlants } from "./queries";
 
@@ -30,8 +29,8 @@ export function plantsParCarre(carres: { id: number; longueur_cm: number | null;
           hauteur: mesuree && mesuree > 0 ? mesuree : HAUTEUR_DEFAUT_CM,
           espacement: p.espacement_cm,
           fruit: fruitier ? couleurFruit(p.nom, p.nom_scientifique) : null,
-          // Non fruitier mais fleurit d'après les sources (mois de floraison renseignés) : petites fleurs
-          fleurs: !fruitier && parseMois(p.mois_floraison).length > 0 ? couleurFleur(p.nom, p.nom_scientifique, p.id) : null,
+          // Non fruitier mais espèce à fleurs visibles : petites fleurs
+          fleurs: fruitier ? null : couleurFleur(p.nom, p.nom_scientifique),
         };
       }),
     );
