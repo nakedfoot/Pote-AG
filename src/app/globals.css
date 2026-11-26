@@ -8,14 +8,15 @@
   --muted: #6b7a6e;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f1711;
-    --foreground: #e6efe6;
-    --card: #17221a;
-    --border: #2a3a2d;
-    --muted: #94a597;
-  }
+/* Mode sombre : classe « dark » posée sur <html> (choix clair / sombre / auto, voir ThemeToggle) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root.dark {
+  --background: #0f1711;
+  --foreground: #e6efe6;
+  --card: #17221a;
+  --border: #2a3a2d;
+  --muted: #94a597;
 }
 
 @theme inline {

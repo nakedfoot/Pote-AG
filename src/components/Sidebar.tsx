@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 type Item = { href: string; label: string; icon: string; highlight?: boolean };
 
@@ -77,7 +78,8 @@ export default function Sidebar({ user, logoutAction }: { user: { nom: string; r
           ))}
         </nav>
       )}
-      <form action={logoutAction} className="mt-auto flex items-center justify-between px-3 pt-4 text-sm">
+      <div className="mt-auto px-1 pt-4"><ThemeToggle /></div>
+      <form action={logoutAction} className="flex items-center justify-between px-3 pt-3 text-sm">
         <span className="truncate text-muted">{user.nom}</span>
         <button className="text-xs underline">Déconnexion</button>
       </form>
