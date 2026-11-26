@@ -45,10 +45,11 @@ export default function CarreGraphic({
   const top = (u: number, v: number): Pt => [x0 + u + v * KX, yt - v * KY];
 
   // Épaisseur du cadre (≈ 3 cm), terre légèrement en contrebas
-  // t : épaisseur des planches (2,1 cm, à l'échelle), identique sur les quatre côtés ; en profondeur (v)
-  // elle est divisée par KY pour que les rebords avant/arrière paraissent aussi épais que ceux de gauche/droite.
-  const t = Math.min(Math.max(EPAISSEUR_CM * s, 1.2), L / 4, (D * KY) / 3);
-  const tv = t / KY;
+  // t : épaisseur des planches (2,1 cm, à l'échelle) mesurée sur la longueur. Les rebords gauche/droite sont
+  // inclinés par la perspective : leur épaisseur perpendiculaire vaut t·sin(θ). En profondeur (v), on choisit tv pour
+  // que les rebords avant/arrière aient exactement la même épaisseur apparente (tv·KY = t·sin(θ) → tv = t / |(KX, KY)|).
+  const t = Math.min(Math.max(EPAISSEUR_CM * s, 1.2), L / 4, D / 6);
+  const tv = t / Math.hypot(KX, KY);
   const creux = h > 0 ? Math.min(Hh * 0.25, 7) : 0;
   const soil = (pts: Pt[]) => pts.map(([x, y]) => [x, y + creux] as Pt);
 
