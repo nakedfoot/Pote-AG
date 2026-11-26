@@ -20,6 +20,7 @@ export function plantsParCarre(carres: { id: number; longueur_cm: number | null;
       plants.map((p) => {
         const i = sans.indexOf(p);
         const mesuree = derniereHauteur(p.id)?.hauteur_cm;
+        const fruitier = estFruitier(p.comestible, p.nom, p.nom_scientifique);
         return {
           id: p.id,
           nom: p.nom,
@@ -28,9 +29,9 @@ export function plantsParCarre(carres: { id: number; longueur_cm: number | null;
           type: estTypePlante(p.type_plante) ? p.type_plante : devinerType(p.nom, p.nom_scientifique, p.hauteur_cm),
           hauteur: mesuree && mesuree > 0 ? mesuree : HAUTEUR_DEFAUT_CM,
           espacement: p.espacement_cm,
-          fruit: estFruitier(p.comestible) ? couleurFruit(p.nom, p.nom_scientifique) : null,
+          fruit: fruitier ? couleurFruit(p.nom, p.nom_scientifique) : null,
           // Non fruitier mais fleurit d'après les sources (mois de floraison renseignés) : petites fleurs
-          fleurs: !estFruitier(p.comestible) && parseMois(p.mois_floraison).length > 0 ? couleurFleur(p.nom, p.nom_scientifique, p.id) : null,
+          fleurs: !fruitier && parseMois(p.mois_floraison).length > 0 ? couleurFleur(p.nom, p.nom_scientifique, p.id) : null,
         };
       }),
     );

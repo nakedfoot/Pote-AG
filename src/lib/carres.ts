@@ -61,9 +61,9 @@ export type PlantDessin = {
 
 const sansAccent = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const MOTS: [TypePlante, RegExp][] = [
-  ["arbre", /pommier|poirier|cerisier|prunier|olivier|figuier|abricotier|pecher|oranger|citronnier|noyer|chene|erable|chataignier|amandier|mirabellier|cognassier|\barbre\b/],
+  ["arbre", /pommier|poirier|cerisier|prunier|olivier|figuier|abricotier|pecher|oranger|citronnier|noyer|chene|erable|chataignier|amandier|mirabellier|cognassier|\barbre\b|prunus|malus|pyrus|citrus|ficus|juglans|olea\b|castanea|amygdalus|quercus|fagus|acer\b/],
   ["grimpante", /vigne|clematite|lierre|kiwi|pois de senteur|chevrefeuille|houblon|glycine|jasmin|liseron|grimpant/],
-  ["arbuste", /framboisier|groseillier|cassis|cassissier|myrtille|rosier|buis|noisetier|romarin|hortensia|lilas|laurier|forsythia|arbuste|murier/],
+  ["arbuste", /framboisier|groseillier|cassis|cassissier|myrtille|rosier|buis|noisetier|romarin|hortensia|lilas|laurier|forsythia|arbuste|murier|ribes|rubus|vaccinium|rosa\b|corylus|buxus/],
   ["fleur", /\brose\b|tulipe|lavande|tournesol|pivoine|dahlia|oeillet|capucine|souci|bleuet|pensee|\blys\b|iris|geranium|marguerite|narcisse|jonquille|cosmos|zinnia|petunia|primevere|fleur/],
 ];
 
@@ -74,28 +74,36 @@ export function devinerType(nom: string, nomScientifique: string | null, hauteur
   return hauteurAdulteCm !== null && hauteurAdulteCm >= 400 ? "arbre" : "herbacee";
 }
 
-/** Fruitier : les sources botaniques (Perenual, Trefle) indiquent des fruits comestibles. */
-export const estFruitier = (comestible: string | null) => !!comestible && /fruit/i.test(sansAccent(comestible));
+/**
+ * Fruitier : les sources botaniques (Perenual, Trefle) indiquent des fruits comestibles, ou bien l'espèce est un
+ * fruitier connu d'après son nom ou son nom scientifique (OpenPlantbook ne renseigne pas les parties comestibles).
+ */
+export function estFruitier(comestible: string | null, nom = "", nomScientifique: string | null = null): boolean {
+  if (comestible && /fruit/i.test(sansAccent(comestible))) return true;
+  const t = sansAccent(`${nom} ${nomScientifique ?? ""}`);
+  if (/laurier/.test(t)) return false; // laurier-cerise, laurier-rose… : pas des fruitiers
+  return FRUITS.some(([re]) => re.test(t));
+}
 
 const FRUITS: [RegExp, string][] = [
   [/mirabelle/, "#f0c23a"],
-  [/pomm/, "#d9362b"],
-  [/poir/, "#c8cf3a"],
-  [/cerise|cerisier/, "#a3122a"],
-  [/prun|quetsche/, "#6b3a8f"],
-  [/abricot/, "#f2a03d"],
-  [/pech/, "#f4a07a"],
-  [/orang|clementine|mandarine/, "#f28c1c"],
-  [/citron/, "#f2dc2e"],
-  [/fig/, "#5b3a6e"],
-  [/framboise/, "#c2185b"],
-  [/groseille/, "#d11a2a"],
-  [/cassis/, "#2b1b3a"],
-  [/myrtille/, "#3b4a8a"],
+  [/pomm|malus/, "#d9362b"],
+  [/poir|pyrus/, "#c8cf3a"],
+  [/cerise|cerisier|prunus avium|prunus cerasus/, "#a3122a"],
+  [/pech|prunus persica|amygdalus persica|nectarine/, "#f4a07a"],
+  [/abricot|prunus armeniaca/, "#f2a03d"],
+  [/prun|quetsche|prunus domestica|prunus(?! laurocerasus| serrulata| lusitanica)/, "#6b3a8f"],
+  [/orang|clementine|mandarine|citrus sinensis|citrus reticulata/, "#f28c1c"],
+  [/citron|citrus/, "#f2dc2e"],
+  [/\bfig|ficus carica/, "#5b3a6e"],
+  [/framboise|rubus idaeus/, "#c2185b"],
+  [/groseille|ribes rubrum/, "#d11a2a"],
+  [/cassis|ribes nigrum/, "#2b1b3a"],
+  [/myrtille|vaccinium/, "#3b4a8a"],
   [/raisin|vigne|vitis/, "#6a3d7d"],
   [/kiwi/, "#8a6a3a"],
-  [/noix|noyer|noisett/, "#8a6a3a"],
-  [/olive/, "#5a6b2a"],
+  [/noix|noyer|noisett|juglans|corylus/, "#8a6a3a"],
+  [/olive|olea europaea/, "#5a6b2a"],
 ];
 
 /** Couleur des fruits d'après le nom (et le nom scientifique) ; rouge orangé par défaut. */
