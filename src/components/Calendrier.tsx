@@ -26,7 +26,7 @@ type Props = {
 export default function Calendrier({ valeurs, sources, moisCourant, onToggle, masquerVides }: Props) {
   const lignes = PERIODE_KEYS.filter((k) => !masquerVides || parseMois(valeurs[PERIODES[k].col] as string | null).length > 0);
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto p-1">
       <div className="grid min-w-[36rem] grid-cols-[9rem_repeat(12,minmax(1.6rem,1fr))_6rem] items-center gap-1 text-xs">
         <span />
         {MOIS_INITIALES.map((m, i) => (
