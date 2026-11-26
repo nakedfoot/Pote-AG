@@ -27,7 +27,7 @@ export default async function VuePotagerPage({ searchParams }: PageProps<"/vue-p
   const plants = listPlants();
 
   return (
-    <div className="max-w-6xl space-y-4">
+    <div className={`space-y-4 ${vue === "plan" ? "max-w-6xl" : ""}`}>
       <h1 className="text-2xl font-semibold">🗺️ Vue potager</h1>
       <nav className="flex gap-1 overflow-x-auto border-b border-border">
         {(Object.keys(VUES) as Vue[]).map((v) => (
