@@ -2,23 +2,31 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { savePlan, supprimerPlan, uploadPlan } from "@/app/actions/plan";
+import { savePlan, savePlanEchelle, supprimerPlan, uploadPlan } from "@/app/actions/plan";
 import AutoRefresh from "@/components/AutoRefresh";
+import { DEFAUT_CARRE_CM, formatDimensions } from "@/lib/carres";
 
 export type Rect = { x: number; y: number; w: number; h: number }; // fractions (0..1) de l'image
 export type Etat2 = "ok" | "bas" | "haut" | "inconnu" | "vide";
 export type PlantInfo = { id: number; nom: string; variete: string | null; etat: Etat2; aArroser: boolean; batterieBasse: boolean };
 export type ZoneItem = { id: number; nom: string; couleur: string; rect: Rect | null; etat: Etat2 };
-export type CarreItem = { id: number; zone_id: number; nom: string; rect: Rect | null; etat: Etat2; plants: PlantInfo[] };
+export type CarreItem = {
+  id: number; zone_id: number; nom: string; rect: Rect | null; etat: Etat2; plants: PlantInfo[];
+  /** Dimensions réelles (cm) et rotation de 90° sur le plan */
+  longueur: number | null; largeur: number | null; rot: number;
+};
 
 const COULEUR: Record<Etat2, string> = { ok: "#16a34a", bas: "#f59e0b", haut: "#dc2626", inconnu: "#6b7280", vide: "#94a3b8" };
 const LIBELLE: Record<Etat2, string> = { ok: "OK", bas: "Trop bas", haut: "Trop haut", inconnu: "Pas de mesure", vide: "Aucun plant" };
 const MIN = 0.02;
+/** Largeur réelle supposée de l'image tant que l'échelle n'est pas renseignée (cm) */
+const ECHELLE_DEFAUT_CM = 2000;
 const clamp = (n: number, a = 0, b = 1) => Math.min(b, Math.max(a, n));
 
 type Drag = { key: string; mode: "move" | "resize"; sx: number; sy: number; orig: Rect };
+type Ghost = { id: number; sx: number; sy: number; x: number; y: number; moved: boolean };
 
-export default function PlanView({ version, zones, carres }: { version: number | null; zones: ZoneItem[]; carres: CarreItem[] }) {
+export default function PlanView({ version, zones, carres, echelleCm }: { version: number | null; zones: ZoneItem[]; carres: CarreItem[]; echelleCm: number | null }) {
   const [edit, setEdit] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [arm, setArm] = useState<string | null>(null); // élément en cours de dessin
@@ -29,6 +37,11 @@ export default function PlanView({ version, zones, carres }: { version: number |
     for (const c of carres) r[`c${c.id}`] = c.rect;
     return r;
   });
+  const [rots, setRots] = useState<Record<number, number>>(() => Object.fromEntries(carres.map((c) => [c.id, c.rot])));
+  const [ratio, setRatio] = useState(1.5); // largeur / hauteur de l'image
+  const [ghost, setGhost] = useState<Ghost | null>(null);
+  const [largeurM, setLargeurM] = useState(echelleCm ? String(Number((echelleCm / 100).toFixed(2))) : "");
+  const [echMsg, setEchMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [dirty, setDirty] = useState(false);
   const [failed, setFailed] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -36,11 +49,33 @@ export default function PlanView({ version, zones, carres }: { version: number |
   const box = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const drawStart = useRef<{ x: number; y: number } | null>(null);
+  const ghostRef = useRef(ghost);
+  const rectsRef = useRef(rects);
+  const rotsRef = useRef(rots);
+  const echelle = echelleCm ?? ECHELLE_DEFAUT_CM;
+
+  /** Taille d'un carré sur le plan (fractions de l'image), à l'échelle : longueur réelle / largeur réelle de l'image. */
+  const tailleCarre = (c: CarreItem, rot = rots[c.id] ?? 0) => {
+    const l = c.longueur ?? DEFAUT_CARRE_CM, w = c.largeur ?? DEFAUT_CARRE_CM;
+    const [a, b] = rot ? [w, l] : [l, w];
+    return { w: Math.min(1, a / echelle), h: Math.min(1, (b / echelle) * ratio) };
+  };
+  /** Rectangle d'un carré placé, ramené dans l'image. */
+  const rectCarre = (c: CarreItem, base: Rect | null | undefined, rot = rots[c.id] ?? 0): Rect | null => {
+    if (!base) return null;
+    const t = tailleCarre(c, rot);
+    return { x: clamp(base.x, 0, 1 - t.w), y: clamp(base.y, 0, 1 - t.h), ...t };
+  };
 
   const pos = (e: React.PointerEvent) => {
     const b = box.current!.getBoundingClientRect();
     return { x: clamp((e.clientX - b.left) / b.width), y: clamp((e.clientY - b.top) / b.height) };
   };
+  useEffect(() => {
+    ghostRef.current = ghost;
+    rectsRef.current = rects;
+    rotsRef.current = rots;
+  }, [ghost, rects, rots]);
   const setRect = (key: string, r: Rect | null) => {
     setRects((prev) => ({ ...prev, [key]: r }));
     setDirty(true);
@@ -77,8 +112,8 @@ export default function PlanView({ version, zones, carres }: { version: number |
   };
 
   // ---- Déplacement / redimensionnement d'un rectangle existant ----
-  const startDrag = (e: React.PointerEvent, key: string, mode: Drag["mode"]) => {
-    const orig = rects[key];
+  const startDrag = (e: React.PointerEvent, key: string, mode: Drag["mode"], over?: Rect) => {
+    const orig = over ?? rects[key];
     if (!edit || arm || !orig) return;
     e.stopPropagation();
     setSelected(key);
@@ -104,10 +139,79 @@ export default function PlanView({ version, zones, carres }: { version: number |
     drag.current = null;
   };
 
+  // ---- Glisser un carré depuis la liste (ou depuis le plan vers la liste pour le retirer) ----
+  const ghostActif = ghost !== null;
+  useEffect(() => {
+    if (!ghostActif) return;
+    const move = (e: PointerEvent) =>
+      setGhost((g) => (g ? { ...g, x: e.clientX, y: e.clientY, moved: g.moved || Math.hypot(e.clientX - g.sx, e.clientY - g.sy) > 5 } : g));
+    const up = (e: PointerEvent) => {
+      const g = ghostRef.current;
+      setGhost(null);
+      if (!g?.moved || !box.current) return;
+      const c = carres.find((x) => x.id === g.id);
+      if (!c) return;
+      const b = box.current.getBoundingClientRect();
+      const dansPlan = e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom;
+      if (dansPlan) {
+        // Le carré se centre sur le point de dépôt
+        const t = tailleCarre(c);
+        const x = clamp((e.clientX - b.left) / b.width - t.w / 2, 0, 1 - t.w);
+        const y = clamp((e.clientY - b.top) / b.height - t.h / 2, 0, 1 - t.h);
+        setRect(`c${c.id}`, { x, y, ...t });
+        setSelected(`c${c.id}`);
+      } else if (document.elementsFromPoint(e.clientX, e.clientY).some((el) => el instanceof HTMLElement && el.dataset.dropListe !== undefined)) {
+        setRect(`c${c.id}`, null);
+      }
+    };
+    const cancel = () => setGhost(null);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ghostActif]);
+
+  const startGhost = (e: React.PointerEvent, id: number) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    setGhost({ id, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, moved: false });
+  };
+
+  const tourner = (c: CarreItem) => {
+    const rot = (rots[c.id] ?? 0) ? 0 : 1;
+    setRots((r) => ({ ...r, [c.id]: rot }));
+    const base = rects[`c${c.id}`];
+    if (base) setRect(`c${c.id}`, { ...base, ...tailleCarre(c, rot) });
+  };
+
+  const enregistrerEchelle = () => {
+    const m = Number(largeurM.replace(",", "."));
+    if (!Number.isFinite(m) || m <= 0) {
+      setEchMsg({ ok: false, text: "Indiquez une largeur en mètres." });
+      return;
+    }
+    start(async () => {
+      try {
+        const r = await savePlanEchelle(Math.round(m * 100));
+        setEchMsg({ ok: r.ok, text: r.ok ? "✓ Échelle enregistrée" : r.message });
+        if (r.ok) {
+          setDirty(true); // les carrés changent de taille : on réenregistre leurs dimensions
+        }
+      } catch {
+        setEchMsg({ ok: false, text: "Enregistrement impossible. Réessayez." });
+      }
+    });
+  };
+
   const enregistrer = () => {
     const entries = [
       ...zones.map((z) => ({ type: "zone", id: z.id, rect: rects[`z${z.id}`] ?? null })),
-      ...carres.map((c) => ({ type: "carre", id: c.id, rect: rects[`c${c.id}`] ?? null })),
+      ...carres.map((c) => ({ type: "carre", id: c.id, rect: rectCarre(c, rects[`c${c.id}`]), rot: rots[c.id] ?? 0 })),
     ];
     setDirty(false); // si on modifie encore pendant l'envoi, dirty repasse à true et un nouvel envoi suivra
     start(async () => {
@@ -128,7 +232,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
     const t = setTimeout(enregistrer, 700);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dirty, pending, rects]);
+  }, [dirty, pending, rects, rots]);
 
   // Évite de quitter la page avec une modification encore en cours d'envoi.
   useEffect(() => {
@@ -187,7 +291,16 @@ export default function PlanView({ version, zones, carres }: { version: number |
           onClick={() => !edit && setSelected(null)}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/plan?v=${version}`} alt="Plan du jardin" draggable={false} className="block h-auto w-full" />
+          <img
+            src={`/api/plan?v=${version}`}
+            alt="Plan du jardin"
+            draggable={false}
+            className="block h-auto w-full"
+            ref={(el) => {
+              if (el?.complete && el.naturalWidth) setRatio((r) => (r === el.naturalWidth / el.naturalHeight ? r : el.naturalWidth / el.naturalHeight));
+            }}
+            onLoad={(e) => setRatio(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
+          />
 
           {zones.map((z) => {
             const r = rects[`z${z.id}`];
@@ -216,33 +329,26 @@ export default function PlanView({ version, zones, carres }: { version: number |
           })}
 
           {carres.map((c) => {
-            const r = rects[`c${c.id}`];
-            if (!r) return null;
             const key = `c${c.id}`;
+            const r = rectCarre(c, rects[key]);
+            if (!r) return null;
             const col = COULEUR[c.etat];
             const alerte = c.plants.filter((p) => p.etat === "bas" || p.etat === "haut").length;
             const arroser = c.plants.some((p) => p.aArroser);
             return (
               <div
                 key={key}
-                style={{ ...rectStyle(r), borderColor: col, backgroundColor: `${col}55`, touchAction: edit ? "none" : "auto" }}
+                style={{ ...rectStyle(r), borderColor: col, backgroundColor: `${col}55`, boxShadow: "inset 0 0 0 2px rgba(120,80,40,0.55)", touchAction: edit ? "none" : "auto" }}
                 className={`absolute rounded-md border-2 ${selected === key ? "z-30 ring-2 ring-white" : "z-20"} ${edit && !arm ? "cursor-move" : "cursor-pointer"}`}
-                onPointerDown={(e) => startDrag(e, key, "move")}
+                onPointerDown={(e) => startDrag(e, key, "move", r)}
                 onPointerMove={onDragMove}
                 onPointerUp={endDrag}
                 onClick={(e) => { e.stopPropagation(); setSelected(key); }}
-                title={`${c.nom} — ${LIBELLE[c.etat]}`}
+                title={`${c.nom} — ${formatDimensions(c.longueur, c.largeur, null) ?? "dimensions non renseignées"} — ${LIBELLE[c.etat]}`}
               >
                 <span className="pointer-events-none absolute inset-x-0.5 top-0.5 truncate rounded bg-black/55 px-1 text-center text-[11px] font-medium leading-4 text-white">
                   {c.nom}{c.plants.length > 0 && ` · ${c.plants.length}`}{arroser && " 💧"}{alerte > 0 && " ⚠️"}
                 </span>
-                {edit && selected === key && !arm && (
-                  <span
-                    className="absolute -bottom-2 -right-2 h-5 w-5 cursor-nwse-resize rounded-full border-2 border-white bg-green-700"
-                    style={{ touchAction: "none" }}
-                    onPointerDown={(e) => startDrag(e, key, "resize")}
-                  />
-                )}
               </div>
             );
           })}
@@ -261,7 +367,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
         </div>
 
         {/* ---- Panneau latéral ---- */}
-        <aside className="card space-y-3 self-start text-sm">
+        <aside data-drop-liste className="card space-y-3 self-start text-sm">
           {edit ? (
             <>
               <h2 className="font-semibold">Placer sur le plan</h2>
@@ -273,9 +379,22 @@ export default function PlanView({ version, zones, carres }: { version: number |
               ) : (
                 <p className="text-muted">
                   {nonPlaces > 0 ? `${nonPlaces} élément(s) pas encore placé(s). ` : ""}
-                  Cliquez « Placer », puis tracez le rectangle. Déplacez un rectangle en le faisant glisser, redimensionnez-le avec la poignée verte. Les modifications sont enregistrées automatiquement.
+                  Glissez un carré de la liste sur le plan : il y est dessiné à l&apos;échelle. Déplacez-le ensuite directement sur le plan. Pour une zone, cliquez « Placer » puis tracez son rectangle (poignée verte pour la redimensionner). Les modifications sont enregistrées automatiquement.
                 </p>
               )}
+              <div className="space-y-1 rounded-lg bg-black/5 p-2 dark:bg-white/5">
+                <label className="font-medium" htmlFor="plan-largeur">Largeur réelle de l&apos;image (m)</label>
+                <div className="flex gap-2">
+                  <input id="plan-largeur" value={largeurM} onChange={(e) => setLargeurM(e.target.value)} inputMode="decimal" placeholder="ex. 15" className="input min-w-0 flex-1" />
+                  <button className="btn-secondary" onClick={enregistrerEchelle} disabled={pending}>OK</button>
+                </div>
+                <p className="text-xs text-muted">
+                  Distance réelle d&apos;un bord à l&apos;autre du plan : les carrés sont dessinés à leurs dimensions réelles.
+                  {!echelleCm && " Non renseignée : 20 m sont supposés."}
+                  {echelleCm && ratio > 0 && ` Hauteur déduite : ${Number(((echelleCm / ratio) / 100).toFixed(1))} m.`}
+                </p>
+                {echMsg && <p className={`text-xs ${echMsg.ok ? "text-green-700" : "text-red-700"}`}>{echMsg.text}</p>}
+              </div>
               <ul className="space-y-1">
                 {zones.map((z) => (
                   <li key={z.id}>
@@ -287,11 +406,23 @@ export default function PlanView({ version, zones, carres }: { version: number |
                     <ul className="ml-4 space-y-1">
                       {carres.filter((c) => c.zone_id === z.id).map((c) => (
                         <li key={c.id}>
-                          <EditRow
-                            label={c.nom} placed={!!rects[`c${c.id}`]} active={selected === `c${c.id}`}
-                            onSelect={() => setSelected(`c${c.id}`)} onPlace={() => { setSelected(null); setArm(`c${c.id}`); }}
-                            onRemove={() => { setRect(`c${c.id}`, null); setSelected(null); }}
-                          />
+                          <div className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1 ${selected === `c${c.id}` ? "bg-green-100 dark:bg-green-900/30" : ""} ${ghost?.id === c.id && ghost.moved ? "opacity-40" : ""}`}>
+                            <div
+                              onPointerDown={(e) => startGhost(e, c.id)}
+                              style={{ touchAction: "none" }}
+                              className="min-w-0 flex-1 cursor-grab select-none active:cursor-grabbing"
+                              title="Glisser sur le plan"
+                            >
+                              <span className={`block truncate ${rects[`c${c.id}`] ? "" : "text-muted"}`}>⠿ {c.nom}{!rects[`c${c.id}`] && " (non placé)"}</span>
+                              <span className="block truncate text-xs text-muted">{formatDimensions(c.longueur, c.largeur, null) ?? "dimensions non renseignées"}</span>
+                            </div>
+                            <span className="flex shrink-0 gap-1">
+                              <button className="rounded border border-border px-2 text-xs hover:bg-black/5" onClick={() => tourner(c)} title="Tourner de 90°">↻</button>
+                              {rects[`c${c.id}`] && (
+                                <button className="rounded border border-border px-2 text-xs hover:bg-black/5" onClick={() => { setRect(`c${c.id}`, null); setSelected(null); }} title="Retirer du plan">✕</button>
+                              )}
+                            </span>
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -372,6 +503,11 @@ export default function PlanView({ version, zones, carres }: { version: number |
           )}
         </aside>
       </div>
+      {ghost?.moved && (
+        <div className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 border-amber-700 bg-amber-200/90 px-3 py-1 text-sm font-medium shadow-xl" style={{ left: ghost.x, top: ghost.y }}>
+          {carres.find((c) => c.id === ghost.id)?.nom}
+        </div>
+      )}
     </div>
   );
 }

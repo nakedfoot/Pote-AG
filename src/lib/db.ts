@@ -148,6 +148,8 @@ const MIGRATIONS: string[] = [
   ALTER TABLE plant ADD COLUMN plan_w REAL;
   ALTER TABLE plant ADD COLUMN plan_h REAL;
   `,
+  // v11 : carré tourné de 90° sur le plan du jardin
+  `ALTER TABLE carre ADD COLUMN plan_rot INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };

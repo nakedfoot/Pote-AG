@@ -8,7 +8,7 @@ import { syncPlantNow } from "@/lib/mqtt-service";
 import { deletePlanImage, savePlanImage } from "@/lib/image";
 import type { ActionResult } from "./settings";
 
-type Entry = { type: "zone" | "carre"; id: number; rect: { x: number; y: number; w: number; h: number } | null };
+type Entry = { type: "zone" | "carre"; id: number; rect: { x: number; y: number; w: number; h: number } | null; rot?: number };
 
 const clamp = (n: unknown) => Math.min(1, Math.max(0, Number(n) || 0));
 
@@ -30,6 +30,7 @@ export async function savePlan(json: string): Promise<ActionResult> {
       const x = clamp(e.rect.x), y = clamp(e.rect.y);
       const w = Math.min(clamp(e.rect.w), 1 - x), h = Math.min(clamp(e.rect.h), 1 - y);
       run(`UPDATE ${table} SET plan_x = ?, plan_y = ?, plan_w = ?, plan_h = ? WHERE id = ?`, x, y, w, h, id);
+      if (table === "carre") run("UPDATE carre SET plan_rot = ? WHERE id = ?", e.rot ? 1 : 0, id);
     } else {
       run(`UPDATE ${table} SET plan_x = NULL, plan_y = NULL, plan_w = NULL, plan_h = NULL WHERE id = ?`, id);
     }
@@ -58,6 +59,16 @@ export async function placerPlant(
   }
   if (plant.carre_id !== carreId) syncPlantNow(id); // zone et carré font partie du message publié
   return { ok: true, message: "Enregistré." };
+}
+
+/** Largeur réelle (en cm) représentée par l'image du plan : sert à placer les carrés à l'échelle. */
+export async function savePlanEchelle(cm: number): Promise<ActionResult> {
+  await requireUser();
+  const v = Number(cm);
+  if (!Number.isFinite(v) || v < 50 || v > 1_000_000) return { ok: false, message: "Largeur invalide (entre 0,5 m et 10 km)." };
+  run("INSERT INTO settings (cle, valeur) VALUES ('plan_longueur_cm', ?) ON CONFLICT(cle) DO UPDATE SET valeur = excluded.valeur", String(v));
+  revalidatePath("/vue-potager");
+  return { ok: true, message: "Échelle enregistrée." };
 }
 
 export async function uploadPlan(formData: FormData) {

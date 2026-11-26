@@ -1,7 +1,7 @@
 import Link from "next/link";
 import PlanView, { type CarreItem, type Etat2, type PlantInfo, type Rect, type ZoneItem } from "@/components/PlanView";
 import PotagerBoard, { type BoardCarre, type BoardPlant } from "@/components/PotagerBoard";
-import { all } from "@/lib/db";
+import { all, get } from "@/lib/db";
 import { planVersion } from "@/lib/image";
 import { listCarres, listPlants, listZones, plantStatus } from "@/lib/queries";
 
@@ -65,6 +65,8 @@ function Carres({ zones, carres, plants }: { zones: ReturnType<typeof listZones>
 function Plan({ zones, carres, plants, erreur }: { zones: ReturnType<typeof listZones>; carres: ReturnType<typeof listCarres>; plants: ReturnType<typeof listPlants>; erreur: string | string[] | undefined }) {
   const planZ = new Map(all<PlanCols>("SELECT id, plan_x, plan_y, plan_w, plan_h FROM zone").map((r) => [r.id, r]));
   const planC = new Map(all<PlanCols>("SELECT id, plan_x, plan_y, plan_w, plan_h FROM carre").map((r) => [r.id, r]));
+  const rotC = new Map(all<{ id: number; plan_rot: number }>("SELECT id, plan_rot FROM carre").map((r) => [r.id, r.plan_rot]));
+  const echelleCm = Number(get<{ valeur: string }>("SELECT valeur FROM settings WHERE cle = 'plan_longueur_cm'")?.valeur) || null;
 
   const parCarre = new Map<number, PlantInfo[]>();
   for (const p of plants) {
@@ -81,7 +83,10 @@ function Plan({ zones, carres, plants, erreur }: { zones: ReturnType<typeof list
 
   const carreItems: CarreItem[] = carres.map((c) => {
     const list = parCarre.get(c.id) ?? [];
-    return { id: c.id, zone_id: c.zone_id, nom: c.nom, rect: rectOf(planC.get(c.id)), etat: list.length ? pire(list.map((p) => p.etat)) : "vide", plants: list };
+    return {
+      id: c.id, zone_id: c.zone_id, nom: c.nom, rect: rectOf(planC.get(c.id)), etat: list.length ? pire(list.map((p) => p.etat)) : "vide", plants: list,
+      longueur: c.longueur_cm, largeur: c.largeur_cm, rot: rotC.get(c.id) ?? 0,
+    };
   });
   const zoneItems: ZoneItem[] = zones.map((z) => {
     const mine = carreItems.filter((c) => c.zone_id === z.id);
@@ -98,7 +103,7 @@ function Plan({ zones, carres, plants, erreur }: { zones: ReturnType<typeof list
           Commencez par créer vos <Link href="/zones" className="underline">zones</Link> et vos <Link href="/carres" className="underline">carrés</Link>, puis placez-les sur le plan.
         </p>
       )}
-      <PlanView version={planVersion()} zones={zoneItems} carres={carreItems} />
+      <PlanView version={planVersion()} zones={zoneItems} carres={carreItems} echelleCm={echelleCm} />
     </div>
   );
 }
