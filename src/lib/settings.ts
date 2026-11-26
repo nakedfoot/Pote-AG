@@ -130,3 +130,31 @@ export function saveSourcesSettings(next: SourcesSettings) {
     perenualKey: next.perenualKey ? encrypt(next.perenualKey) : prev.perenualKey,
   });
 }
+
+// ---------- Irrigation (réglages globaux) ----------
+export type Plage = { debut: string; fin: string }; // "HH:MM"
+
+export type IrrigationSettings = {
+  latitude: number | null;
+  longitude: number | null;
+  fuseau: string; // fuseau horaire IANA : plages horaires et quotas journaliers
+  plages: Plage[]; // plages horaires proposées par défaut aux nouveaux canaux
+  mesureMaxMin: number; // âge maximal d'une mesure d'humidité pour lancer un arrosage
+  meteoIndispo: "ignorer" | "bloquer"; // que faire des règles météo si Open-Meteo ne répond pas
+  pause: boolean; // pause globale des arrosages automatiques
+  pauseJusqu: string | null; // AAAA-MM-JJ (inclus) ; null = jusqu'à reprise manuelle
+};
+
+export const IRRIGATION_DEFAULTS: IrrigationSettings = {
+  latitude: null,
+  longitude: null,
+  fuseau: "Europe/Paris",
+  plages: [{ debut: "05:00", fin: "10:00" }, { debut: "19:00", fin: "22:00" }],
+  mesureMaxMin: 30,
+  meteoIndispo: "ignorer",
+  pause: false,
+  pauseJusqu: null,
+};
+
+export const getIrrigationSettings = (): IrrigationSettings => read<IrrigationSettings>("irrigation", IRRIGATION_DEFAULTS);
+export const saveIrrigationSettings = (next: IrrigationSettings) => write("irrigation", next);

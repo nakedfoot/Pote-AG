@@ -61,6 +61,23 @@ export function getLive(friendlyName: string): Live | undefined {
   return st().live.get(friendlyName);
 }
 
+export const isMqttConnected = () => st().connected;
+
+/** Envoie une commande à un appareil Zigbee2MQTT (`<base>/<nom>/set`). Faux si MQTT est hors ligne. */
+export function publishCommand(friendlyName: string, payload: Record<string, unknown>): boolean {
+  const s = st();
+  if (!s.client || !s.connected) return false;
+  s.client.publish(`${s.z2mBase}/${friendlyName}/set`, JSON.stringify(payload), { qos: 1 }, (err) => {
+    if (err) s.error = `Commande impossible : ${err.message}`;
+  });
+  return true;
+}
+
+/** Dernier état ON/OFF connu d'un appareil (null si jamais reçu). */
+export function deviceState(friendlyName: string): string | null {
+  return st().live.get(friendlyName)?.etats?.state ?? null;
+}
+
 /** Extrait les champs numériques d'un `definition.exposes` Zigbee2MQTT (récursif). */
 function numericExposes(exposes: unknown, out: ChampInfo[] = []): ChampInfo[] {
   if (!Array.isArray(exposes)) return out;
@@ -71,6 +88,16 @@ function numericExposes(exposes: unknown, out: ChampInfo[] = []): ChampInfo[] {
     if (Array.isArray(e.features)) numericExposes(e.features, out);
   }
   return out;
+}
+
+/** Vrai si l'appareil expose un interrupteur (propriété `state` ON/OFF) : vanne, prise… */
+function hasSwitch(exposes: unknown): boolean {
+  if (!Array.isArray(exposes)) return false;
+  for (const e of exposes as Record<string, unknown>[]) {
+    if (e.property === "state" && e.value_on === "ON") return true;
+    if (Array.isArray(e.features) && hasSwitch(e.features)) return true;
+  }
+  return false;
 }
 
 function handleDevices(payload: Buffer) {
@@ -86,15 +113,16 @@ function handleDevices(payload: Buffer) {
     if (d.type === "Coordinator" || typeof d.friendly_name !== "string") continue;
     const champs = numericExposes(d.definition?.exposes).filter((c) => !["linkquality", "voltage", "battery"].includes(c.champ));
     const modele = d.definition?.model ?? null;
+    const commutable = hasSwitch(d.definition?.exposes) ? 1 : 0;
     const ieee = d.ieee_address ?? null;
     const known = ieee ? get<{ id: number }>("SELECT id FROM capteur WHERE ieee_addr = ?", ieee) : undefined;
     if (known) {
-      run("UPDATE capteur SET friendly_name = ?, modele = ?, champs = ? WHERE id = ?", d.friendly_name, modele, JSON.stringify(champs), known.id);
+      run("UPDATE capteur SET friendly_name = ?, modele = ?, champs = ?, commutable = ? WHERE id = ?", d.friendly_name, modele, JSON.stringify(champs), commutable, known.id);
     } else {
       run(
-        `INSERT INTO capteur (friendly_name, ieee_addr, modele, champs) VALUES (?, ?, ?, ?)
-         ON CONFLICT(friendly_name) DO UPDATE SET ieee_addr = excluded.ieee_addr, modele = excluded.modele, champs = excluded.champs`,
-        d.friendly_name, ieee, modele, JSON.stringify(champs),
+        `INSERT INTO capteur (friendly_name, ieee_addr, modele, champs, commutable) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(friendly_name) DO UPDATE SET ieee_addr = excluded.ieee_addr, modele = excluded.modele, champs = excluded.champs, commutable = excluded.commutable`,
+        d.friendly_name, ieee, modele, JSON.stringify(champs), commutable,
       );
     }
   }
@@ -112,13 +140,17 @@ function handleDeviceState(friendly: string, payload: Buffer) {
   for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
     if (typeof v === "number" && Number.isFinite(v)) values[k] = v;
   }
-  if (Object.keys(values).length === 0) return;
+  // État ON/OFF d'une vanne ou d'une prise
+  const etat = (data as Record<string, unknown>).state;
+  const etats = typeof etat === "string" ? { state: etat.toUpperCase() } : undefined;
+  if (Object.keys(values).length === 0 && !etats) return;
 
   const s = st();
   const now = Date.now();
   // On fusionne : certains capteurs n'envoient qu'une partie des champs à chaque message.
   const prev = s.live.get(friendly);
-  s.live.set(friendly, { values: { ...(prev?.values ?? {}), ...values }, ts: now });
+  s.live.set(friendly, { values: { ...(prev?.values ?? {}), ...values }, etats: { ...(prev?.etats ?? {}), ...etats }, ts: now });
+  if (Object.keys(values).length === 0) return;
 
   const cap = get<{ id: number }>("SELECT id FROM capteur WHERE friendly_name = ?", friendly);
   if (!cap) return;

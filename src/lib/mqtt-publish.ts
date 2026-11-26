@@ -285,6 +285,40 @@ export function publishRappels(d: Deps) {
   );
 }
 
+// ---------- Irrigation ----------
+const irrigationTopic = (cfg: MqttSettings) => `${cfg.publishPrefix}/irrigation`;
+export type IrrigationPublie = {
+  canaux: { id: number; nom: string; etat: string; message: string; humidite: number | null; vanne: string | null; auto: boolean }[];
+  alertes: { canal: string; message: string; date: string }[];
+};
+
+/**
+ * État de l'irrigation (retenu) : deux capteurs Home Assistant — nombre d'alertes non lues et nombre de vannes ouvertes —
+ * dont les attributs détaillent les canaux. Les alertes sont aussi publiées une à une (non retenues) par publishIrrigationAlerte.
+ */
+export function publishIrrigation(d: Deps, data: IrrigationPublie) {
+  const st = irrigationTopic(d.cfg);
+  const ouverts = data.canaux.filter((c) => c.etat === "ouvert" || c.etat === "pause");
+  d.publish(st, JSON.stringify({ date: new Date().toISOString(), alertes: data.alertes.length, ouverts: data.canaux.filter((c) => c.etat === "ouvert").length, detail_alertes: data.alertes, canaux: data.canaux, en_cours: ouverts.length }), true);
+  const device = { identifiers: [nodeId(d.cfg, "hub")], name: "Potager", manufacturer: "Potager", model: "Application" };
+  const defs: [string, Record<string, unknown>][] = [
+    ["alertes", { name: "Alertes irrigation", unique_id: `${nodeId(d.cfg, "hub")}_irrigation_alertes`, value_template: "{{ value_json.alertes }}", json_attributes_template: "{{ {'alertes': value_json.detail_alertes} | tojson }}", icon: "mdi:water-alert" }],
+    ["ouverts", { name: "Vannes d'irrigation ouvertes", unique_id: `${nodeId(d.cfg, "hub")}_irrigation_ouverts`, value_template: "{{ value_json.ouverts }}", json_attributes_template: "{{ {'canaux': value_json.canaux} | tojson }}", icon: "mdi:sprinkler-variant" }],
+  ];
+  for (const [k, p] of defs) {
+    d.publish(
+      `${d.cfg.haDiscoveryPrefix}/sensor/${nodeId(d.cfg, "hub")}/irrigation_${k}/config`,
+      d.cfg.haDiscovery ? JSON.stringify({ ...p, state_topic: st, json_attributes_topic: st, availability: [{ topic: statusTopic(d.cfg) }], device }) : "",
+      true,
+    );
+  }
+}
+
+/** Alerte d'irrigation, publiée au moment où elle survient (non retenue) : de quoi déclencher une notification. */
+export function publishIrrigationAlerte(d: Deps, a: { date: string; canal: string; message: string }) {
+  d.publish(`${irrigationTopic(d.cfg)}/alerte`, JSON.stringify(a), false);
+}
+
 /** Plant supprimé : on efface tout ce qui a été publié (retained). */
 export function removePlant(d: Deps, plantId: number) {
   removeTopics(d, storedTopics().filter((t) => t.includes(`/${nodeId(d.cfg, plantId)}/`)));

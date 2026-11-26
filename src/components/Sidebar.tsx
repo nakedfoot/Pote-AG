@@ -14,6 +14,7 @@ const MAIN: Item[] = [
   { href: "/vue-potager", label: "Vue potager", icon: "🗺️" },
   { href: "/zones", label: "Zones", icon: "📍" },
   { href: "/carres", label: "Carrés", icon: "🟩" },
+  { href: "/irrigation", label: "Irrigation", icon: "💦" },
 ];
 
 const SETTINGS: Item[] = [

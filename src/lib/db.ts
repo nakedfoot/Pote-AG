@@ -152,6 +152,37 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE carre ADD COLUMN plan_rot INTEGER NOT NULL DEFAULT 0;`,
   // v12 : la rotation du carré sur le plan est un angle libre en degrés (0 ou 1 = 90° avant)
   `UPDATE carre SET plan_rot = plan_rot * 90;`,
+  // v13 : irrigation — canaux (une vanne Zigbee + des carrés), journal des arrosages et des alertes
+  `
+  ALTER TABLE capteur ADD COLUMN commutable INTEGER NOT NULL DEFAULT 0;
+  CREATE TABLE irrigation_canal (
+    id INTEGER PRIMARY KEY,
+    nom TEXT NOT NULL,
+    capteur_id INTEGER REFERENCES capteur(id) ON DELETE SET NULL,
+    actif INTEGER NOT NULL DEFAULT 1,
+    auto INTEGER NOT NULL DEFAULT 1,
+    config TEXT NOT NULL DEFAULT '{}',
+    k_appris REAL
+  );
+  CREATE TABLE irrigation_canal_carre (
+    canal_id INTEGER NOT NULL REFERENCES irrigation_canal(id) ON DELETE CASCADE,
+    carre_id INTEGER NOT NULL REFERENCES carre(id) ON DELETE CASCADE,
+    PRIMARY KEY (canal_id, carre_id)
+  );
+  CREATE TABLE irrigation_log (
+    id INTEGER PRIMARY KEY,
+    canal_id INTEGER NOT NULL REFERENCES irrigation_canal(id) ON DELETE CASCADE,
+    ts INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    niveau TEXT NOT NULL DEFAULT 'info',
+    message TEXT NOT NULL,
+    duree_s INTEGER,
+    hum_avant REAL,
+    hum_apres REAL,
+    vu INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX idx_irrigation_log ON irrigation_log(canal_id, ts);
+  `,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };
