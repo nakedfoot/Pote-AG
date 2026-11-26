@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "30mb" },
     proxyClientMaxBodySize: "30mb",
+    // Cache client des pages visitées/préchargées : revenir sur un onglet est instantané (30 s max ; les actions et AutoRefresh rafraîchissent)
+    staleTimes: { dynamic: 30, static: 30 },
   },
   turbopack: {
     rules: {

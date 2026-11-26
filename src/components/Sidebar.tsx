@@ -36,7 +36,7 @@ function NavLink({ item, active, onNavigate }: { item: Item; active: boolean; on
       ? `${base} bg-green-600/15 font-medium text-green-800 dark:text-green-300`
       : `${base} hover:bg-black/5 dark:hover:bg-white/5`;
   return (
-    <Link href={item.href} className={cls} onClick={onNavigate}>
+    <Link href={item.href} prefetch className={cls} onClick={onNavigate}>
       <span aria-hidden>{item.icon}</span>
       <span>{item.label}</span>
       <Pending />
