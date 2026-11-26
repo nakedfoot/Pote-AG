@@ -14,6 +14,14 @@ export type Plant = {
   hum_sol_min: number | null; hum_sol_max: number | null;
   ec_min: number | null; ec_max: number | null;
   lux_min: number | null; lux_max: number | null;
+  nom_scientifique: string | null;
+  mois_plantation: string | null; mois_floraison: string | null; mois_fructification: string | null;
+  mois_recolte: string | null; mois_taille: string | null; mois_dormance: string | null;
+  cycle: string | null; exposition: string | null; arrosage: string | null; rusticite: string | null;
+  ph_min: number | null; ph_max: number | null; hauteur_cm: number | null; espacement_cm: number | null;
+  jours_recolte: number | null; comestible: string | null; toxicite: string | null; description: string | null;
+  /** JSON SourcesData : provenance de chaque champ et identifiants dans chaque source */
+  sources_data: string | null;
 };
 export type PlantRow = Plant & { carre_nom: string | null; zone_id: number | null; zone_nom: string | null };
 export type Evenement = { id: number; plant_id: number; type: string; date: string; commentaire: string | null };

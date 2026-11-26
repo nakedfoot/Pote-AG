@@ -1,4 +1,5 @@
 import { get, run } from "./db";
+import { DEFAULT_ORDER, PROVIDER_IDS, type ProviderId } from "./botanique";
 import { decrypt, encrypt } from "./crypto";
 
 export type MqttSettings = {
@@ -87,5 +88,45 @@ export function saveOpbSettings(next: OpbSettings) {
   write("openplantbook", {
     clientId: next.clientId,
     clientSecret: next.clientSecret ? encrypt(next.clientSecret) : prev.clientSecret,
+  });
+}
+
+// ---------- Sources botaniques (ordre de priorité, activation, clés) ----------
+export type SourcesSettings = {
+  order: ProviderId[];
+  enabled: Record<ProviderId, boolean>;
+  trefleToken: string; // en clair côté serveur uniquement
+  perenualKey: string; // en clair côté serveur uniquement
+  inatPlaceId: number | null; // lieu iNaturalist pour la phénologie (6753 = France)
+};
+
+export const SOURCES_DEFAULTS: SourcesSettings = {
+  order: DEFAULT_ORDER,
+  enabled: { openplantbook: true, trefle: true, inaturalist: true, perenual: true },
+  trefleToken: "",
+  perenualKey: "",
+  inatPlaceId: 6753,
+};
+
+export function getSourcesSettings(): SourcesSettings {
+  const s = read<SourcesSettings>("sources", SOURCES_DEFAULTS);
+  // Ordre : on garde les sources connues dans l'ordre enregistré, puis on ajoute celles qui manqueraient.
+  const order = [...new Set([...(s.order ?? []).filter((p) => PROVIDER_IDS.includes(p)), ...DEFAULT_ORDER])];
+  return {
+    ...s,
+    order,
+    enabled: { ...SOURCES_DEFAULTS.enabled, ...s.enabled },
+    trefleToken: decrypt(s.trefleToken),
+    perenualKey: decrypt(s.perenualKey),
+  };
+}
+
+/** Clé vide = clé précédente conservée. */
+export function saveSourcesSettings(next: SourcesSettings) {
+  const prev = read<SourcesSettings>("sources", SOURCES_DEFAULTS);
+  write("sources", {
+    ...next,
+    trefleToken: next.trefleToken ? encrypt(next.trefleToken) : prev.trefleToken,
+    perenualKey: next.perenualKey ? encrypt(next.perenualKey) : prev.perenualKey,
   });
 }

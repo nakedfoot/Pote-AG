@@ -91,6 +91,31 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE capteur ADD COLUMN champs TEXT NOT NULL DEFAULT '[]';`,
   // v3 : topics de découverte Home Assistant publiés (pour pouvoir les retirer proprement)
   `CREATE TABLE mqtt_discovery (topic TEXT PRIMARY KEY);`,
+  // v4 : calendrier et caractéristiques botaniques (complétés par les sources externes), cache des API
+  `
+  ALTER TABLE plant ADD COLUMN nom_scientifique TEXT;
+  ALTER TABLE plant ADD COLUMN mois_plantation TEXT;
+  ALTER TABLE plant ADD COLUMN mois_floraison TEXT;
+  ALTER TABLE plant ADD COLUMN mois_fructification TEXT;
+  ALTER TABLE plant ADD COLUMN mois_recolte TEXT;
+  ALTER TABLE plant ADD COLUMN mois_taille TEXT;
+  ALTER TABLE plant ADD COLUMN mois_dormance TEXT;
+  ALTER TABLE plant ADD COLUMN cycle TEXT;
+  ALTER TABLE plant ADD COLUMN exposition TEXT;
+  ALTER TABLE plant ADD COLUMN arrosage TEXT;
+  ALTER TABLE plant ADD COLUMN rusticite TEXT;
+  ALTER TABLE plant ADD COLUMN ph_min REAL;
+  ALTER TABLE plant ADD COLUMN ph_max REAL;
+  ALTER TABLE plant ADD COLUMN hauteur_cm REAL;
+  ALTER TABLE plant ADD COLUMN espacement_cm REAL;
+  ALTER TABLE plant ADD COLUMN jours_recolte REAL;
+  ALTER TABLE plant ADD COLUMN comestible TEXT;
+  ALTER TABLE plant ADD COLUMN toxicite TEXT;
+  ALTER TABLE plant ADD COLUMN description TEXT;
+  ALTER TABLE plant ADD COLUMN sources_data TEXT;
+  UPDATE plant SET nom_scientifique = json_extract(opb_data, '$.display_pid') WHERE opb_data IS NOT NULL AND json_valid(opb_data);
+  CREATE TABLE source_cache (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL, ts INTEGER NOT NULL);
+  `,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };

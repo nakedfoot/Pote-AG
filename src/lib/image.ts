@@ -51,6 +51,19 @@ export function deleteUpload(photo: string | null | undefined) {
   fs.rmSync(path.join(UPLOAD_DIR, name), { force: true });
 }
 
+/** Copie une photo téléversée pour un autre plant ; retourne le nouveau chemin (ou null si la source est absente). */
+export function copyUpload(photo: string, plantId: number): string | null {
+  const name = photo.slice("/uploads/".length);
+  if (!UPLOAD_NAME.test(name)) return null;
+  const dest = `plant-${plantId}-${Date.now()}.jpg`;
+  try {
+    fs.copyFileSync(path.join(UPLOAD_DIR, name), path.join(UPLOAD_DIR, dest));
+    return `/uploads/${dest}`;
+  } catch {
+    return null;
+  }
+}
+
 async function loadBytes(photo: string): Promise<Buffer | null> {
   try {
     if (photo.startsWith("/uploads/")) {

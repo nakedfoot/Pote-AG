@@ -2,7 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { saveMqtt, testMqtt, republishMqtt, saveOpb, testOpb, type ActionResult } from "@/app/actions/settings";
+import {
+  completerPlants, republishMqtt, saveMqtt, saveSources, testInatAction, testMqtt, testOpb, testPerenualAction, testTrefleAction,
+  type ActionResult,
+} from "@/app/actions/settings";
+import { PROVIDERS, type ProviderId } from "@/lib/botanique";
 
 type MqttView = {
   host: string; port: number | null; tls: boolean; username: string; hasPassword: boolean;
@@ -137,34 +141,126 @@ export function MqttForm({ v }: { v: MqttView }) {
   );
 }
 
-export function OpbForm({ clientId, hasSecret }: { clientId: string; hasSecret: boolean }) {
+export type SourcesView = {
+  order: ProviderId[];
+  enabled: Record<ProviderId, boolean>;
+  opbClientId: string;
+  hasOpbSecret: boolean;
+  hasTrefleToken: boolean;
+  hasPerenualKey: boolean;
+  inatPlaceId: number | null;
+};
+
+const APPORTS: Record<ProviderId, string> = {
+  openplantbook: "Seuils : température, humidité de l'air et du sol, conductivité, luminosité. Photo.",
+  trefle: "Mois de floraison et de fructification, dormance (mois hors croissance), jours avant récolte, pH, températures, espacement, hauteur, exposition, cycle, parties comestibles, toxicité.",
+  inaturalist: "Noms communs en français, description (Wikipédia), mois de floraison et de fructification observés localement. Sans clé.",
+  perenual: "Saisons de floraison, de fructification et de récolte, mois de taille, cycle, arrosage, exposition, rusticité, hauteur, comestibilité, toxicité, description (en anglais).",
+};
+
+export function SourcesForm({ v }: { v: SourcesView }) {
+  const { result, pending, run, router } = useFormActions();
+  const [order, setOrder] = useState<ProviderId[]>(v.order);
+  const move = (i: number, d: -1 | 1) => {
+    const next = [...order];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    setOrder(next);
+  };
+  const clearSecrets = (form: HTMLFormElement) => () => {
+    for (const n of ["clientSecret", "trefleToken", "perenualKey"]) {
+      const el = form.elements.namedItem(n);
+      if (el instanceof HTMLInputElement) el.value = "";
+    }
+    router.refresh();
+  };
+  const test = (action: Act) => (e: React.MouseEvent<HTMLButtonElement>) => run(e.currentTarget.form, action);
+
+  const champs: Record<ProviderId, React.ReactNode> = {
+    openplantbook: (
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Client ID" hint="Gratuit sur open.plantbook.io (API credentials).">
+          <input name="clientId" defaultValue={v.opbClientId} autoComplete="off" className="input" />
+        </Field>
+        <Field label="Client Secret" hint={v.hasOpbSecret ? "Enregistré. Laisser vide pour le conserver." : undefined}>
+          <input name="clientSecret" type="password" autoComplete="new-password" placeholder={v.hasOpbSecret ? "••••••••••••" : ""} className="input" />
+        </Field>
+      </div>
+    ),
+    trefle: (
+      <Field label="Jeton (token)" hint={v.hasTrefleToken ? "Enregistré. Laisser vide pour le conserver." : "Gratuit sur trefle.io."}>
+        <input name="trefleToken" type="password" autoComplete="new-password" placeholder={v.hasTrefleToken ? "••••••••••••" : ""} className="input" />
+      </Field>
+    ),
+    inaturalist: (
+      <Field label="Lieu pour la phénologie (identifiant iNaturalist)" hint="6753 = France. Repli automatique sur l'Europe s'il y a trop peu d'observations.">
+        <input name="inatPlaceId" type="number" defaultValue={v.inatPlaceId ?? ""} className="input max-w-40" />
+      </Field>
+    ),
+    perenual: (
+      <Field label="Clé d'API" hint={v.hasPerenualKey ? "Enregistrée. Laisser vide pour la conserver." : "Gratuite sur perenual.com (quota quotidien limité : les réponses sont mises en cache)."}>
+        <input name="perenualKey" type="password" autoComplete="new-password" placeholder={v.hasPerenualKey ? "••••••••••••" : ""} className="input" />
+      </Field>
+    ),
+  };
+  const tests: Record<ProviderId, Act> = { openplantbook: testOpb, trefle: testTrefleAction, inaturalist: testInatAction, perenual: testPerenualAction };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(e.currentTarget, saveSources, clearSecrets(e.currentTarget));
+      }}
+      className="max-w-3xl space-y-4"
+    >
+      <p className="text-sm text-muted">
+        Ordre de priorité : pour chaque champ, la première source qui fournit une valeur l&apos;emporte ; les suivantes ne servent qu&apos;à compléter les champs restés vides.
+      </p>
+      {order.map((p, i) => (
+        <section key={p} className="card space-y-3">
+          <input type="hidden" name="order" value={p} />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-green-700 text-sm font-semibold text-white">{i + 1}</span>
+              <h2 className="font-semibold">{PROVIDERS[p]}</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-sm"><input type="checkbox" name={`enabled_${p}`} defaultChecked={v.enabled[p]} /> Activée</label>
+              <button type="button" className="btn-secondary text-xs" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Monter">↑</button>
+              <button type="button" className="btn-secondary text-xs" disabled={i === order.length - 1} onClick={() => move(i, 1)} aria-label="Descendre">↓</button>
+            </div>
+          </div>
+          <p className="text-xs text-muted">{APPORTS[p]}</p>
+          {champs[p]}
+          <button type="button" onClick={test(tests[p])} className="btn-secondary text-xs" disabled={pending}>Tester</button>
+        </section>
+      ))}
+      <Result r={result} />
+      <button className="btn" disabled={pending}>{pending ? "Veuillez patienter…" : "Enregistrer"}</button>
+    </form>
+  );
+}
+
+export function CompleterPlantsForm() {
   const { result, pending, run, router } = useFormActions();
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        const form = e.currentTarget;
-        run(form, saveOpb, () => {
-          const pw = form.elements.namedItem("clientSecret");
-          if (pw instanceof HTMLInputElement) pw.value = "";
-          router.refresh();
-        });
+        run(e.currentTarget, completerPlants, () => router.refresh());
       }}
-      className="card max-w-xl space-y-4"
+      className="card max-w-3xl space-y-3"
     >
-      <Field label="Client ID" hint="Disponible gratuitement dans votre compte sur open.plantbook.io (API credentials).">
-        <input name="clientId" defaultValue={clientId} autoComplete="off" className="input" required />
-      </Field>
-      <Field label="Client Secret" hint={hasSecret ? "Un secret est enregistré. Laisser vide pour le conserver." : undefined}>
-        <input name="clientSecret" type="password" autoComplete="new-password" placeholder={hasSecret ? "••••••••••••" : ""} className="input" />
-      </Field>
+      <h2 className="font-semibold">Compléter les plants</h2>
+      <p className="text-sm text-muted">
+        Interroge les sources pour tous les plants et remplit les champs vides (calendrier, caractéristiques, seuils). Les valeurs saisies à la main ne sont jamais modifiées.
+        Les plants sans nom scientifique sont identifiés à partir de leur nom via iNaturalist.
+      </p>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="rafraichir" />
+        Rechercher les mises à jour : ignorer le cache et actualiser aussi les valeurs déjà issues des sources
+      </label>
       <Result r={result} />
-      <div className="flex gap-3">
-        <button className="btn" disabled={pending}>{pending ? "Veuillez patienter…" : "Enregistrer"}</button>
-        <button type="button" onClick={(e) => run(e.currentTarget.form, testOpb)} className="btn-secondary" disabled={pending}>
-          Tester les identifiants
-        </button>
-      </div>
+      <button className="btn" disabled={pending}>{pending ? "Interrogation des sources… (peut prendre quelques minutes)" : "Compléter les plants"}</button>
     </form>
   );
 }

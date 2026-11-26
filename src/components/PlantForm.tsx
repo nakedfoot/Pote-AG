@@ -3,90 +3,193 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { savePlant } from "@/app/actions/garden";
+import Calendrier from "@/components/Calendrier";
+import {
+  CARAC_KEYS, CARACS, FIELD_KEYS, MOIS_COLS, PROVIDERS, parseMois, parseSourcesData, versTexte,
+  type FieldKey, type Fiche, type ProviderId, type SourcesData,
+} from "@/lib/botanique";
 import { METRICS, METRIC_KEYS, STATUTS, Z2M_FIELD_HINTS, type MetricKey } from "@/lib/metrics";
 import type { Carre, Plant, Zone } from "@/lib/queries";
 import type { CapteurView } from "@/lib/mqtt-service";
-import type { OpbDetail, OpbSearchResult } from "@/lib/opb";
+import type { Suggestion } from "@/lib/sources";
 
 type Props = {
   plant?: Plant;
   zones: Zone[];
   carres: (Carre & { zone_nom: string })[];
-  hasOpbKey: boolean;
+  /** Au moins une source botanique active */
+  hasSources: boolean;
   /** Associations existantes : métrique -> "capteurId|champ" */
   assoc: Partial<Record<MetricKey, string>>;
 };
 
-const OPB_TO_COLS: Record<string, keyof OpbDetail> = {
-  temp_min: "min_temp", temp_max: "max_temp",
-  hum_air_min: "min_env_humid", hum_air_max: "max_env_humid",
-  hum_sol_min: "min_soil_moist", hum_sol_max: "max_soil_moist",
-  ec_min: "min_soil_ec", ec_max: "max_soil_ec",
-  lux_min: "min_light_lux", lux_max: "max_light_lux",
+/** Réponse de /api/plantes (fiche fusionnée selon l'ordre de priorité des sources). */
+type Collecte = {
+  sci: string;
+  fiche: Fiche;
+  champs: Partial<Record<string, ProviderId>>;
+  ids: SourcesData["ids"];
+  erreurs: string[];
+  opbData: unknown;
 };
 
-export default function PlantForm({ plant, zones, carres, hasOpbKey, assoc }: Props) {
+const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+export default function PlantForm({ plant, zones, carres, hasSources, assoc }: Props) {
   const today = new Date().toISOString().slice(0, 10);
+  const [initial] = useState(() => parseSourcesData(plant?.sources_data));
   const [nom, setNom] = useState(plant?.nom ?? "");
   const [variete, setVariete] = useState(plant?.variete ?? "");
   const [photo, setPhoto] = useState(plant?.photo ?? "");
   const [opbPid, setOpbPid] = useState(plant?.opb_pid ?? "");
   const [opbData, setOpbData] = useState(plant?.opb_data ?? "");
-  const [seuils, setSeuils] = useState<Record<string, string>>(() => {
-    const o: Record<string, string> = {};
-    for (const k of METRIC_KEYS) for (const c of [METRICS[k].min, METRICS[k].max]) o[c] = String(plant?.[c as keyof Plant] ?? "");
-    return o;
-  });
-  const [filled, setFilled] = useState(false);
+  const [vals, setVals] = useState<Record<FieldKey, string>>(
+    () => Object.fromEntries(FIELD_KEYS.map((k) => [k, versTexte(k, plant?.[k] ?? null)])) as Record<FieldKey, string>,
+  );
+  const [src, setSrc] = useState<SourcesData["champs"]>(initial.champs);
+  const [ids, setIds] = useState<SourcesData["ids"]>(() => ({
+    ...initial.ids,
+    ...(plant?.opb_pid && !initial.ids.openplantbook ? { openplantbook: plant.opb_pid } : {}),
+  }));
+  const [verifie, setVerifie] = useState(initial.verifie);
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<{ ok: boolean; text: string } | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const shownPhoto = preview ?? (photo || null);
 
-  function applyOpb(d: OpbDetail) {
-    setOpbPid(d.pid);
-    setOpbData(JSON.stringify(d));
-    if (!nom) setNom(d.alias ?? d.display_pid ?? d.pid);
-    if (d.image_url) setPhoto(d.image_url);
-    const next = { ...seuils };
-    for (const [col, key] of Object.entries(OPB_TO_COLS)) {
-      const v = d[key];
-      next[col] = v === null || v === undefined ? "" : String(v);
-    }
-    setSeuils(next);
-    setFilled(true);
+  /** Saisie manuelle : la valeur n'est plus attribuée à une source (et ne sera jamais écrasée). */
+  function setVal(k: FieldKey, v: string) {
+    setVals((x) => ({ ...x, [k]: v }));
+    setSrc((x) => {
+      const n = { ...x };
+      delete n[k];
+      return n;
+    });
   }
 
-  function unlinkOpb() {
+  function toggleMois(col: string, m: number) {
+    const cur = parseMois(vals[col as FieldKey]);
+    setVal(col as FieldKey, (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]).sort((a, b) => a - b).join(","));
+  }
+
+  /** Remplit uniquement les champs vides avec la fiche fusionnée. */
+  function appliquer(c: Collecte, base: Record<FieldKey, string>) {
+    const nv = { ...base };
+    const ns = { ...src };
+    const utilisees = new Set<ProviderId>();
+    let n = 0;
+    for (const k of FIELD_KEYS) {
+      if (nv[k] !== "") continue;
+      const t = versTexte(k, c.fiche[k]);
+      if (!t) continue;
+      nv[k] = t;
+      const p = c.champs[k];
+      if (p) {
+        ns[k] = p;
+        utilisees.add(p);
+      }
+      n++;
+    }
+    if (!nv.nom_scientifique) nv.nom_scientifique = c.sci;
+    setVals(nv);
+    setSrc(ns);
+    setIds((x) => ({ ...x, ...c.ids }));
+    setVerifie(new Date().toISOString());
+    if (!photo && !preview && typeof c.fiche.photo === "string" && c.fiche.photo) setPhoto(c.fiche.photo);
+    if (!nom && typeof c.fiche.nom_commun === "string" && c.fiche.nom_commun) setNom(majuscule(c.fiche.nom_commun));
+    if (c.opbData && !opbPid && c.ids.openplantbook) {
+      setOpbPid(c.ids.openplantbook);
+      setOpbData(JSON.stringify(c.opbData));
+    }
+    const sources = [...utilisees].map((p) => PROVIDERS[p]).join(", ");
+    setInfo({
+      ok: c.erreurs.length === 0 || n > 0,
+      text:
+        (n ? `${n} champ(s) complété(s)${sources ? ` (${sources})` : ""}, modifiables ci-dessous.` : "Aucun champ vide n'a pu être complété.") +
+        (c.erreurs.length ? ` Sources indisponibles : ${c.erreurs.join(" ; ")}` : ""),
+    });
+  }
+
+  async function interroger(params: Record<string, string>, base: Record<FieldKey, string>) {
+    setBusy(true);
+    setInfo(null);
+    try {
+      const res = await fetch(`/api/plantes?${new URLSearchParams(params)}`);
+      const json = await res.json();
+      if (!res.ok) setInfo({ ok: false, text: json.error ?? "Erreur" });
+      else appliquer(json as Collecte, base);
+    } catch {
+      setInfo({ ok: false, text: "Sources injoignables (réseau)." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function choisir(s: Suggestion) {
+    const base = { ...vals, nom_scientifique: s.sci };
+    setVals(base);
+    setIds((x) => ({ ...x, ...s.ids }));
+    void interroger({ sci: s.sci, ids: JSON.stringify({ ...ids, ...s.ids }) }, base);
+  }
+
+  function completer() {
+    if (vals.nom_scientifique) void interroger({ sci: vals.nom_scientifique, ids: JSON.stringify(ids) }, vals);
+    else if (nom) void interroger({ nom }, vals);
+    else setInfo({ ok: false, text: "Renseignez d'abord le nom ou le nom scientifique." });
+  }
+
+  /** Changer d'espèce : retire les valeurs issues des sources (les saisies manuelles restent). */
+  function changerEspece() {
+    const nv = { ...vals, nom_scientifique: "" };
+    for (const k of Object.keys(src) as FieldKey[]) nv[k] = "";
+    setVals(nv);
+    setSrc({});
+    setIds({});
     setOpbPid("");
     setOpbData("");
-    setFilled(false);
+    setInfo(null);
   }
 
   const d = (v: string | null | undefined) => v ?? "";
+  const srcLabel = (k: FieldKey) => (src[k] ? PROVIDERS[src[k]] : null);
+  const sourcesData: SourcesData = { champs: src, ids, ...(verifie ? { verifie } : {}) };
   return (
     <form action={savePlant} className="max-w-3xl space-y-6">
       {plant && <input type="hidden" name="id" value={plant.id} />}
       <input type="hidden" name="opb_pid" value={opbPid} />
       <input type="hidden" name="opb_data" value={opbData} />
       <input type="hidden" name="photo" value={photo} />
+      <input type="hidden" name="sources_data" value={JSON.stringify(sourcesData)} />
 
       <section className="card space-y-4">
         <h2 className="font-semibold">1. Identité</h2>
-        {opbPid ? (
-          <div className="flex items-center justify-between gap-3 rounded-lg bg-green-100 p-3 text-sm text-green-900">
+        {!hasSources ? (
+          <p className="rounded-lg bg-black/5 p-2 text-xs text-muted dark:bg-white/5">
+            Aucune source botanique active : saisie manuelle. <Link href="/settings/sources" className="underline">Configurer les sources</Link> pour préremplir automatiquement.
+          </p>
+        ) : vals.nom_scientifique ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-green-100 p-3 text-sm text-green-900">
             <div className="flex items-center gap-3">
               {photo && <img src={photo} alt="" className="h-12 w-12 rounded-lg object-cover" />}
-              <span>🌿 Lié à OpenPlantbook : <strong>{opbPid}</strong>{filled && " — champs préremplis, modifiables ci-dessous."}</span>
+              <span>
+                🌿 Espèce : <em className="font-medium">{vals.nom_scientifique}</em>
+                {Object.keys(ids).length > 0 && (
+                  <span className="text-xs"> · fiches : {(Object.keys(ids) as ProviderId[]).map((p) => PROVIDERS[p]).join(", ")}</span>
+                )}
+              </span>
             </div>
-            <button type="button" onClick={unlinkOpb} className="btn-secondary text-xs">Délier</button>
+            <div className="flex gap-2">
+              <button type="button" onClick={completer} disabled={busy} className="btn-secondary text-xs">
+                {busy ? "Interrogation…" : "Compléter depuis les sources"}
+              </button>
+              <button type="button" onClick={changerEspece} disabled={busy} className="btn-secondary text-xs">Changer d&apos;espèce</button>
+            </div>
           </div>
-        ) : hasOpbKey ? (
-          <OpbSearch onPick={applyOpb} />
         ) : (
-          <p className="rounded-lg bg-black/5 p-2 text-xs text-muted dark:bg-white/5">
-            OpenPlantbook non configuré : saisie manuelle. <Link href="/settings/openplantbook" className="underline">Ajouter les identifiants</Link> pour préremplir automatiquement.
-          </p>
+          <PlantSearch onPick={choisir} busy={busy} />
         )}
+        {info && <p className={`rounded-lg p-2 text-xs ${info.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{info.text}</p>}
         <div className="flex items-center gap-4">
           {shownPhoto ? <img src={shownPhoto} alt="" className="h-20 w-20 rounded-xl object-cover" /> : <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-black/5 text-3xl dark:bg-white/5">🌱</div>}
           <div className="space-y-2">
@@ -122,6 +225,19 @@ export default function PlantForm({ plant, zones, carres, hasOpbKey, assoc }: Pr
           <div><label className="label">Nom *</label><input name="nom" value={nom} onChange={(e) => setNom(e.target.value)} required className="input" placeholder="Tomate" /></div>
           <div><label className="label">Variété</label><input name="variete" value={variete} onChange={(e) => setVariete(e.target.value)} className="input" placeholder="Cœur de bœuf" /></div>
         </div>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="label">
+              Nom scientifique{srcLabel("nom_scientifique") && <span className="font-normal text-muted"> · {srcLabel("nom_scientifique")}</span>}
+            </label>
+            <input name="nom_scientifique" value={vals.nom_scientifique} onChange={(e) => setVal("nom_scientifique", e.target.value)} className="input" placeholder="Solanum lycopersicum" />
+          </div>
+          {hasSources && !vals.nom_scientifique && (
+            <button type="button" onClick={completer} disabled={busy} className="btn-secondary" title="Identifie l'espèce à partir du nom puis complète les champs vides">
+              {busy ? "Interrogation…" : "Compléter depuis les sources"}
+            </button>
+          )}
+        </div>
       </section>
 
       <section className="card space-y-4">
@@ -151,15 +267,40 @@ export default function PlantForm({ plant, zones, carres, hasOpbKey, assoc }: Pr
       </section>
 
       <section className="card space-y-4">
-        <h2 className="font-semibold">3. Seuils souhaités <span className="text-xs font-normal text-muted">(optionnels, servent aux alertes)</span></h2>
-        <div className="grid grid-cols-[1fr_6rem_6rem] items-center gap-2 text-sm">
-          <span /><span className="text-xs text-muted">Min</span><span className="text-xs text-muted">Max</span>
+        <h2 className="font-semibold">3. Calendrier <span className="text-xs font-normal text-muted">(cliquez sur un mois pour l&apos;ajouter ou le retirer)</span></h2>
+        {MOIS_COLS.map((k) => <input key={k} type="hidden" name={k} value={vals[k]} />)}
+        <Calendrier valeurs={vals} sources={src} moisCourant={new Date().getMonth() + 1} onToggle={toggleMois} />
+      </section>
+
+      <section className="card space-y-4">
+        <h2 className="font-semibold">4. Caractéristiques <span className="text-xs font-normal text-muted">(optionnelles)</span></h2>
+        <div className="grid grid-cols-2 gap-3">
+          {CARAC_KEYS.map((k) => (
+            <div key={k} className={CARACS[k].type === "textarea" ? "col-span-2" : ""}>
+              <label className="label">
+                {CARACS[k].label}{srcLabel(k) && <span className="font-normal text-muted"> · {srcLabel(k)}</span>}
+              </label>
+              {CARACS[k].type === "textarea" ? (
+                <textarea name={k} value={vals[k]} onChange={(e) => setVal(k, e.target.value)} rows={3} className="input" />
+              ) : (
+                <input name={k} type={CARACS[k].type} step="any" value={vals[k]} onChange={(e) => setVal(k, e.target.value)} className="input" />
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="card space-y-4">
+        <h2 className="font-semibold">5. Seuils souhaités <span className="text-xs font-normal text-muted">(optionnels, servent aux alertes)</span></h2>
+        <div className="grid grid-cols-[1fr_6rem_6rem_6rem] items-center gap-2 text-sm">
+          <span /><span className="text-xs text-muted">Min</span><span className="text-xs text-muted">Max</span><span />
           {METRIC_KEYS.map((k) => (
             <div key={k} className="contents">
               <span>{METRICS[k].icone} {METRICS[k].label} ({METRICS[k].unite})</span>
               {[METRICS[k].min, METRICS[k].max].map((col) => (
-                <input key={col} name={col} type="number" step="any" value={seuils[col]} onChange={(e) => setSeuils({ ...seuils, [col]: e.target.value })} className="input" />
+                <input key={col} name={col} type="number" step="any" value={vals[col]} onChange={(e) => setVal(col, e.target.value)} className="input" />
               ))}
+              <span className="truncate text-xs text-muted">{srcLabel(METRICS[k].min) ?? srcLabel(METRICS[k].max) ?? ""}</span>
             </div>
           ))}
         </div>
@@ -177,10 +318,10 @@ export default function PlantForm({ plant, zones, carres, hasOpbKey, assoc }: Pr
   );
 }
 
-// ---------- Recherche OpenPlantbook ----------
-function OpbSearch({ onPick }: { onPick: (d: OpbDetail) => void }) {
+// ---------- Recherche d'espèce (OpenPlantbook + iNaturalist) ----------
+function PlantSearch({ onPick, busy }: { onPick: (s: Suggestion) => void; busy: boolean }) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<OpbSearchResult[]>([]);
+  const [results, setResults] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
@@ -192,52 +333,46 @@ function OpbSearch({ onPick }: { onPick: (d: OpbDetail) => void }) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/opb?q=${encodeURIComponent(q.trim())}`);
+        const res = await fetch(`/api/plantes?q=${encodeURIComponent(q.trim())}`);
         const json = await res.json();
         if (id !== seq.current) return;
         if (!res.ok) setError(json.error ?? "Erreur de recherche");
-        else setResults(json.results);
+        else {
+          setResults(json.results);
+          if (json.erreurs?.length) setError(json.erreurs.join(" ; "));
+        }
       } catch {
         if (id === seq.current) setError("Recherche impossible (réseau).");
       } finally {
         if (id === seq.current) setLoading(false);
       }
-    }, 350);
+    }, 400);
     return () => clearTimeout(t);
   }, [q]);
 
-  async function pick(r: OpbSearchResult) {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/opb?pid=${encodeURIComponent(r.pid)}`);
-      const json = await res.json();
-      if (!res.ok) setError(json.error ?? "Erreur");
-      else {
-        onPick(json as OpbDetail);
-        setResults([]);
-        setQ("");
-      }
-    } catch {
-      setError("Récupération impossible (réseau).");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <div className="space-y-2">
-      <label className="label">🌿 Rechercher dans OpenPlantbook <span className="font-normal text-muted">(optionnel)</span></label>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom en latin ou en anglais, ex. « Solanum lycopersicum »" className="input" />
-      {loading && <p className="text-xs text-muted">Recherche…</p>}
+      <label className="label">🌿 Rechercher la plante <span className="font-normal text-muted">(optionnel : nom français, latin ou anglais)</span></label>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ex. « tomate » ou « Solanum lycopersicum »" className="input" />
+      {(loading || busy) && <p className="text-xs text-muted">{busy ? "Interrogation des sources…" : "Recherche…"}</p>}
       {error && <p className="text-xs text-red-600">{error}</p>}
       {q.trim().length >= 2 && results.length > 0 && (
-        <ul className="max-h-60 divide-y divide-border overflow-auto rounded-lg border border-border">
+        <ul className="max-h-72 divide-y divide-border overflow-auto rounded-lg border border-border">
           {results.map((r) => (
-            <li key={r.pid}>
-              <button type="button" onClick={() => pick(r)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5">
-                <span>{r.alias || r.display_pid}</span>
-                <span className="text-xs text-muted">{r.display_pid}</span>
+            <li key={r.sci}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  onPick(r);
+                  setResults([]);
+                  setQ("");
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                {r.photo ? <img src={r.photo} alt="" className="h-8 w-8 rounded object-cover" /> : <span className="h-8 w-8" />}
+                <span className="flex-1">{majuscule(r.nom)}</span>
+                <em className="text-xs text-muted">{r.sci}</em>
               </button>
             </li>
           ))}

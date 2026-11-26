@@ -1,3 +1,4 @@
+import { CARAC_KEYS, PERIODE_KEYS, PERIODES, parseMois, parseSourcesData, periodesDuMois } from "./botanique";
 import { all, get, run } from "./db";
 import { thumbnailBase64 } from "./image";
 import { METRICS, METRIC_KEYS, type MetricKey } from "./metrics";
@@ -61,10 +62,15 @@ export async function buildState(cfg: MqttSettings, p: PlantRow) {
 
   const wantUrl = cfg.imageMode === "url" || cfg.imageMode === "both";
   const wantB64 = cfg.imageMode === "base64" || cfg.imageMode === "both";
+  // Calendrier : listes de mois (1 = janvier) ; périodes en cours pour le mois actuel
+  const calendrier = Object.fromEntries(PERIODE_KEYS.map((k) => [k, parseMois(p[PERIODES[k].col])]));
+  const enCours = periodesDuMois(p, new Date().getMonth() + 1);
+  const caracteristiques = Object.fromEntries(CARAC_KEYS.map((k) => [k, p[k] ?? null]));
   return {
     plant_id: p.id,
     nom: p.nom,
     variete: p.variete,
+    nom_scientifique: p.nom_scientifique,
     zone: p.zone_nom,
     carre: p.carre_nom,
     date: new Date().toISOString(),
@@ -77,6 +83,11 @@ export async function buildState(cfg: MqttSettings, p: PlantRow) {
     dernier_arrosage: s.dernierArrosage,
     batterie: s.batterie,
     openplantbook: p.opb_pid,
+    calendrier,
+    periodes_en_cours: enCours,
+    periode_actuelle: enCours.length ? enCours.map((k) => PERIODES[k].label).join(", ") : null,
+    caracteristiques,
+    sources: parseSourcesData(p.sources_data).champs,
     mesures,
     alertes,
     image: {
@@ -147,6 +158,19 @@ function discoveryConfigs(cfg: MqttSettings, p: PlantRow, metriques: MetricKey[]
   out.push({
     topic: t("sensor", "age"),
     payload: { ...common, name: "Âge depuis la plantation", unique_id: `${nid}_age`, state_topic: st, value_template: "{{ value_json.age_jours }}", unit_of_measurement: "j", icon: "mdi:calendar-clock" },
+  });
+  out.push({
+    topic: t("sensor", "periode"),
+    payload: {
+      ...common,
+      name: "Période en cours",
+      unique_id: `${nid}_periode`,
+      state_topic: st,
+      value_template: "{{ value_json.periode_actuelle if value_json.periode_actuelle else 'Aucune' }}",
+      json_attributes_topic: st,
+      json_attributes_template: "{{ {'calendrier': value_json.calendrier, 'periodes_en_cours': value_json.periodes_en_cours, 'caracteristiques': value_json.caracteristiques} | tojson }}",
+      icon: "mdi:calendar-month",
+    },
   });
   out.push({
     topic: t("sensor", "dernier_arrosage"),

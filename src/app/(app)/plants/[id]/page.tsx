@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addEvenement, affecterPlant, deletePlant } from "@/app/actions/garden";
+import { addEvenement, affecterPlant, deletePlant, dupliquerPlant } from "@/app/actions/garden";
 import AutoRefresh from "@/components/AutoRefresh";
+import Calendrier from "@/components/Calendrier";
 import { LineChart, Sparkline } from "@/components/Charts";
+import { CARAC_KEYS, CARACS, MOIS_COLS, PERIODES, PROVIDERS, estVide, parseMois, parseSourcesData, periodesDuMois } from "@/lib/botanique";
 import { isRange, plantMarks, plantSeries, recentSeries, rangeWindow, RANGES, type Range } from "@/lib/history";
 import { METRICS, STATUTS } from "@/lib/metrics";
 import { ageJours, formatDate, getPlant, ilYa, listCarres, listEvenements, listZones, plantStatus, type Plant } from "@/lib/queries";
@@ -59,6 +61,10 @@ export default async function PlantPage({ params, searchParams }: PageProps<"/pl
         </div>
         <div className="flex shrink-0 gap-2">
           <Link href={`/plants/${p.id}/edit`} className="btn-secondary">Modifier</Link>
+          <form action={dupliquerPlant}>
+            <input type="hidden" name="id" value={p.id} />
+            <button className="btn-secondary" title="Crée une copie avec les mêmes données et capteurs (journal vide)">Dupliquer</button>
+          </form>
           <form action={deletePlant}>
             <input type="hidden" name="id" value={p.id} />
             <button className="btn-danger">Supprimer</button>
@@ -174,8 +180,60 @@ function Resume({ p, status }: { p: PlantFull; status: ReturnType<typeof plantSt
         </div>
       </section>
 
+      <Botanique p={p} />
+
       {p.notes && <section className="card"><h2 className="mb-2 font-semibold">Notes</h2><p className="whitespace-pre-wrap text-sm">{p.notes}</p></section>}
     </div>
+  );
+}
+
+/** Calendrier et caractéristiques (avec la source de chaque valeur). */
+function Botanique({ p }: { p: PlantFull }) {
+  const sd = parseSourcesData(p.sources_data);
+  const mois = new Date().getMonth() + 1;
+  const enCours = periodesDuMois(p, mois);
+  const aCalendrier = MOIS_COLS.some((c) => parseMois(p[c]).length > 0);
+  const caracs = CARAC_KEYS.filter((k) => k !== "description" && !estVide(p[k]));
+  const src = (k: keyof typeof sd.champs) => (sd.champs[k] ? <span className="text-xs text-muted"> · {PROVIDERS[sd.champs[k]]}</span> : null);
+  if (!aCalendrier && caracs.length === 0 && !p.description && !p.nom_scientifique) {
+    return (
+      <section className="card text-sm text-muted">
+        Calendrier et caractéristiques non renseignés. <Link href={`/plants/${p.id}/edit`} className="underline">Les compléter</Link> (saisie ou sources botaniques).
+      </section>
+    );
+  }
+  return (
+    <>
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold">Calendrier</h2>
+          <span className="text-sm text-muted">
+            Ce mois-ci : {enCours.length ? enCours.map((k) => `${PERIODES[k].icone} ${PERIODES[k].label}`).join(", ") : "aucune période particulière"}
+          </span>
+        </div>
+        {aCalendrier ? (
+          <Calendrier valeurs={p} sources={sd.champs} moisCourant={mois} masquerVides />
+        ) : (
+          <p className="text-sm text-muted">Aucune période renseignée.</p>
+        )}
+      </section>
+      <section className="card space-y-3">
+        <h2 className="font-semibold">Caractéristiques</h2>
+        {p.nom_scientifique && <p className="text-sm"><span className="text-muted">Nom scientifique : </span><em>{p.nom_scientifique}</em>{src("nom_scientifique")}</p>}
+        {caracs.length > 0 && (
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            {caracs.map((k) => (
+              <div key={k} className="flex justify-between gap-2 border-b border-border py-1">
+                <dt className="text-muted">{CARACS[k].label}</dt>
+                <dd className="text-right">{String(p[k])}{src(k)}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {p.description && <p className="whitespace-pre-wrap text-sm">{p.description}{src("description")}</p>}
+        {sd.verifie && <p className="text-xs text-muted">Sources interrogées le {formatDate(sd.verifie)}.</p>}
+      </section>
+    </>
   );
 }
 

@@ -10,7 +10,7 @@ npm run dev        # http://localhost:3000
 ```
 
 Au premier lancement, créer le compte administrateur sur `/setup`, puis renseigner
-MQTT et OpenPlantbook dans le menu Paramètres.
+MQTT et sources botaniques dans le menu Paramètres.
 
 Les données sont dans `./data` (modifiable avec `DATA_DIR`) :
 `potager.db` (base SQLite), `.secret` (clé de chiffrement des mots de passe/clés API), `uploads/` (photos).

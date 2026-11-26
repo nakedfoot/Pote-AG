@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { get, run } from "@/lib/db";
 import { removePlantNow, snapshotLive, syncAllNow, syncPlantNow } from "@/lib/mqtt-service";
-import { deleteUpload, saveUpload } from "@/lib/image";
-import { METRICS, METRIC_KEYS } from "@/lib/metrics";
+import { copyUpload, deleteUpload, saveUpload } from "@/lib/image";
+import { FIELD_KEYS, formatMois, MOIS_COLS, NUMBER_FIELDS, parseMois, parseSourcesData } from "@/lib/botanique";
+import { METRIC_KEYS } from "@/lib/metrics";
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const nul = (v: string) => (v === "" ? null : v);
@@ -64,11 +65,16 @@ export async function savePlant(formData: FormData) {
   const nom = s(formData, "nom");
   if (!nom) redirect(id ? `/plants/${id}/edit` : "/plants/new");
 
-  const seuils: Record<string, number | null> = {};
-  for (const k of METRIC_KEYS) {
-    seuils[METRICS[k].min] = num(formData, METRICS[k].min);
-    seuils[METRICS[k].max] = num(formData, METRICS[k].max);
+  // Champs botaniques : seuils, calendrier (mois "3,4,5") et caractéristiques
+  const botanique: Record<string, string | number | null> = {};
+  for (const k of FIELD_KEYS) {
+    if (NUMBER_FIELDS.has(k)) botanique[k] = num(formData, k);
+    else if ((MOIS_COLS as readonly string[]).includes(k)) botanique[k] = nul(formatMois(parseMois(s(formData, k))));
+    else botanique[k] = nul(s(formData, k));
   }
+  // Provenance : on ne garde que les champs encore renseignés
+  const sources = parseSourcesData(s(formData, "sources_data"));
+  for (const k of Object.keys(sources.champs) as (keyof typeof sources.champs)[]) if (botanique[k] === null) delete sources.champs[k];
 
   const base = {
     carre_id: Number(formData.get("carre_id")) || null,
@@ -82,7 +88,8 @@ export async function savePlant(formData: FormData) {
     date_recolte_prevue: nul(s(formData, "date_recolte_prevue")),
     statut: s(formData, "statut") || "croissance",
     notes: nul(s(formData, "notes")),
-    ...seuils,
+    ...botanique,
+    sources_data: JSON.stringify(sources),
   };
   const cols = Object.keys(base);
   const vals = Object.values(base) as (string | number | null)[];
@@ -130,7 +137,29 @@ export async function deletePlant(formData: FormData) {
   run("DELETE FROM plant WHERE id = ?", id);
   deleteUpload(photo);
   removePlantNow(id);
-  redirect("/plants");
+  redirect("/");
+}
+
+/** Duplique un plant : toutes ses données, sa photo (copiée) et ses capteurs Zigbee ; journal vide. */
+export async function dupliquerPlant(formData: FormData) {
+  await requireUser();
+  const id = Number(formData.get("id"));
+  const src = get<Record<string, string | number | null>>("SELECT * FROM plant WHERE id = ?", id);
+  if (!src) redirect("/");
+  const cols = Object.keys(src).filter((c) => c !== "id" && c !== "created_at");
+  const vals = cols.map((c) => (c === "nom" ? `${src.nom} (copie)` : src[c]));
+  const r = run(`INSERT INTO plant (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`, ...vals);
+  const newId = Number(r.lastInsertRowid);
+  // Photo téléversée : copie du fichier, pour que supprimer l'un des plants n'efface pas la photo de l'autre
+  const photo = typeof src.photo === "string" ? src.photo : null;
+  if (photo?.startsWith("/uploads/")) run("UPDATE plant SET photo = ? WHERE id = ?", copyUpload(photo, newId), newId);
+  run(
+    "INSERT INTO plant_capteur (plant_id, capteur_id, metrique, champ) SELECT ?, capteur_id, metrique, champ FROM plant_capteur WHERE plant_id = ?",
+    newId,
+    id,
+  );
+  syncPlantNow(newId);
+  redirect(`/plants/${newId}/edit`);
 }
 
 export async function addEvenement(formData: FormData) {

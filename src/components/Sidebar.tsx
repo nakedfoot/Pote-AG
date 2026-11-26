@@ -12,12 +12,11 @@ const MAIN: Item[] = [
   { href: "/vue-potager", label: "Vue potager", icon: "🗺️" },
   { href: "/zones", label: "Zones", icon: "📍" },
   { href: "/carres", label: "Carrés", icon: "🟩" },
-  { href: "/plants", label: "Plants", icon: "🌱" },
 ];
 
 const SETTINGS: Item[] = [
   { href: "/settings/mqtt", label: "Connexion MQTT", icon: "📡" },
-  { href: "/settings/openplantbook", label: "OpenPlantbook", icon: "🌿" },
+  { href: "/settings/sources", label: "Sources botaniques", icon: "🌿" },
   { href: "/settings/users", label: "Utilisateurs", icon: "👤" },
 ];
 
@@ -41,7 +40,7 @@ export default function Sidebar({ user, logoutAction }: { user: { nom: string; r
   // Replié par défaut ; déplié d'office quand on est sur une page de paramètres, sauf choix contraire de l'utilisateur.
   const [manual, setManual] = useState<boolean | null>(null);
   const settingsOpen = manual ?? pathname.startsWith("/settings");
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href) && !(href === "/plants" && pathname === "/plants/new"));
+  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   return (
     <aside className="flex w-60 shrink-0 flex-col gap-1 border-r border-border bg-card p-3">
       <div className="px-3 py-3 text-lg font-semibold">🌱 Potager</div>
