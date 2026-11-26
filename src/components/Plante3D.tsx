@@ -32,10 +32,11 @@ type Depart = [x: number, y: number, ang: number, len: number, w: number, prof: 
  * au bout des rameaux. Le ciel reste visible entre les branches. Sert à l'arbre et à l'arbuste.
  */
 function Ramure({
-  rand, departs, tronc, feuillesTotal, rayonBouquet, tailleFeuille, centre, rx, ry, ecart, fruit,
+  rand, departs, tronc, feuillesTotal, rayonBouquet, tailleFeuille, centre, rx, ry, ecart, fruit, fleurs,
 }: {
   rand: () => number; departs: Depart[]; tronc?: ReactNode; feuillesTotal: number; rayonBouquet: number;
   tailleFeuille: number; centre: number; rx: number; ry: number; ecart: number; fruit?: { couleur: string; rayon: number } | null;
+  fleurs?: { couleur: string; rayon: number } | null;
 }) {
   const segs: Segment[] = [];
   const bouts: { x: number; y: number }[] = [];
@@ -82,6 +83,14 @@ function Ramure({
       })
     : [];
 
+  // Petites fleurs semées dans les bouquets (tirées après les fruits : le reste du dessin ne change pas)
+  const corolles = fleurs
+    ? Array.from({ length: Math.round(clamp(bouts.length * 1.1, 12, 34)) }, () => {
+        const b = bouts[Math.floor(rand() * bouts.length)];
+        return { x: b.x + (rand() - 0.5) * rayonBouquet * 1.8, y: b.y + (rand() - 0.5) * rayonBouquet * 1.5 };
+      })
+    : [];
+
   return (
     <>
       {tronc}
@@ -95,12 +104,20 @@ function Ramure({
           <circle cx={f.x - fruit.rayon * 0.3} cy={f.y - fruit.rayon * 0.3} r={fruit.rayon * 0.3} fill="#fff" opacity={0.55} />
         </g>
       ))}
+      {fleurs && corolles.map((c, i) => (
+        <g key={`fleur${i}`} transform={`translate(${c.x.toFixed(2)} ${c.y.toFixed(2)})`}>
+          {[0, 1, 2, 3, 4].map((k) => (
+            <circle key={k} cx={Math.cos((k * 2 * Math.PI) / 5) * fleurs.rayon * 0.62} cy={Math.sin((k * 2 * Math.PI) / 5) * fleurs.rayon * 0.62} r={fleurs.rayon * 0.5} fill={fleurs.couleur} stroke="#000" strokeOpacity={0.18} strokeWidth={0.25} />
+          ))}
+          <circle r={fleurs.rayon * 0.3} fill="#f5b72e" />
+        </g>
+      ))}
     </>
   );
 }
 
 /** Arbre : tronc évasé qui se divise en une flèche centrale et quatre maîtresses branches. */
-function Arbre({ H, rand, uid, fruit }: { H: number; rand: () => number; uid: string; fruit: string | null }) {
+function Arbre({ H, rand, uid, fruit, fleurs }: { H: number; rand: () => number; uid: string; fruit: string | null; fleurs: string | null }) {
   const tw = Math.max(2, H * 0.06); // largeur du tronc à la base
   const yTronc = -H * 0.36; // sommet du tronc, où partent les branches
   const tronc = (
@@ -121,12 +138,13 @@ function Arbre({ H, rand, uid, fruit }: { H: number; rand: () => number; uid: st
       rand={rand} departs={departs} tronc={tronc} feuillesTotal={240} rayonBouquet={H * 0.085}
       tailleFeuille={clamp(H * 0.085, 2.4, 7)} centre={-H * 0.7} rx={H * 0.4} ry={H * 0.32} ecart={1.15}
       fruit={fruit ? { couleur: fruit, rayon: clamp(H * 0.03, 1.4, 5) } : null}
+      fleurs={fleurs ? { couleur: fleurs, rayon: clamp(H * 0.028, 1.5, 4.5) } : null}
     />
   );
 }
 
 /** Arbuste : plusieurs tiges qui partent du sol et se ramifient, feuillage plus touffu que l'arbre. */
-function Arbuste({ H, rand, fruit }: { H: number; rand: () => number; fruit: string | null }) {
+function Arbuste({ H, rand, fruit, fleurs }: { H: number; rand: () => number; fruit: string | null; fleurs: string | null }) {
   const n = 6;
   const w = Math.max(0.9, H * 0.022);
   const departs: Depart[] = Array.from({ length: n }, (_, k) => {
@@ -138,6 +156,7 @@ function Arbuste({ H, rand, fruit }: { H: number; rand: () => number; fruit: str
       rand={rand} departs={departs} feuillesTotal={480} rayonBouquet={H * 0.085}
       tailleFeuille={clamp(H * 0.075, 2.2, 6.5)} centre={-H * 0.55} rx={H * 0.45} ry={H * 0.47} ecart={1.0}
       fruit={fruit ? { couleur: fruit, rayon: clamp(H * 0.026, 1.2, 4) } : null}
+      fleurs={fleurs ? { couleur: fleurs, rayon: clamp(H * 0.024, 1.3, 4) } : null}
     />
   );
 }
@@ -149,9 +168,9 @@ function Arbuste({ H, rand, fruit }: { H: number; rand: () => number; fruit: str
  * viennent du `<defs>` parent.
  */
 export default function Plante3D({
-  type, x, y, hcm, esp, fruit = null, s, id, uid,
+  type, x, y, hcm, esp, fruit = null, fleurs = null, s, id, uid,
 }: {
-  type: TypePlante; x: number; y: number; hcm: number; esp: number | null; fruit?: string | null; s: number; id: number; uid: string;
+  type: TypePlante; x: number; y: number; hcm: number; esp: number | null; fruit?: string | null; fleurs?: string | null; s: number; id: number; uid: string;
 }) {
   const H = Math.max(hcm * s, 6);
   const u = (n: string) => `url(#${n}${uid})`;
@@ -162,11 +181,11 @@ export default function Plante3D({
   if (type === "arbre") {
     // Couronne d'environ 0,8 × la hauteur
     W = H * 0.8;
-    corps = <Arbre H={H} rand={rand} uid={uid} fruit={fruit} />;
+    corps = <Arbre H={H} rand={rand} uid={uid} fruit={fruit} fleurs={fleurs} />;
   } else if (type === "arbuste") {
     // Buisson : environ 0,9 × la hauteur de large
     W = H * 0.9;
-    corps = <Arbuste H={H} rand={rand} fruit={fruit} />;
+    corps = <Arbuste H={H} rand={rand} fruit={fruit} fleurs={fleurs} />;
   } else if (type === "fleur") {
     W = Math.max(H * 0.35, 5);
     const r = clamp(H * 0.13, 2.5, 14);

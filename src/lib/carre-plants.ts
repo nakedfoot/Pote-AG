@@ -1,4 +1,5 @@
-import { DEFAUT_CARRE_CM, HAUTEUR_DEFAUT_CM, couleurFruit, devinerType, estFruitier, estTypePlante, grille, type PlantDessin } from "./carres";
+import { parseMois } from "./botanique";
+import { DEFAUT_CARRE_CM, HAUTEUR_DEFAUT_CM, couleurFleur, couleurFruit, devinerType, estFruitier, estTypePlante, grille, type PlantDessin } from "./carres";
 import { derniereHauteur, listPlants } from "./queries";
 
 /** Plants de chaque carré, prêts à être dessinés (positions de la vue potager, hauteur mesurée ou 15 cm). */
@@ -28,6 +29,8 @@ export function plantsParCarre(carres: { id: number; longueur_cm: number | null;
           hauteur: mesuree && mesuree > 0 ? mesuree : HAUTEUR_DEFAUT_CM,
           espacement: p.espacement_cm,
           fruit: estFruitier(p.comestible) ? couleurFruit(p.nom, p.nom_scientifique) : null,
+          // Non fruitier mais fleurit d'après les sources (mois de floraison renseignés) : petites fleurs
+          fleurs: !estFruitier(p.comestible) && parseMois(p.mois_floraison).length > 0 ? couleurFleur(p.nom, p.nom_scientifique, p.id) : null,
         };
       }),
     );
