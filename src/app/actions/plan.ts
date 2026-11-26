@@ -30,7 +30,7 @@ export async function savePlan(json: string): Promise<ActionResult> {
       const x = clamp(e.rect.x), y = clamp(e.rect.y);
       const w = Math.min(clamp(e.rect.w), 1 - x), h = Math.min(clamp(e.rect.h), 1 - y);
       run(`UPDATE ${table} SET plan_x = ?, plan_y = ?, plan_w = ?, plan_h = ? WHERE id = ?`, x, y, w, h, id);
-      if (table === "carre") run("UPDATE carre SET plan_rot = ? WHERE id = ?", e.rot ? 1 : 0, id);
+      if (table === "carre") run("UPDATE carre SET plan_rot = ? WHERE id = ?", ((Math.round(Number(e.rot) || 0) % 360) + 360) % 360, id);
     } else {
       run(`UPDATE ${table} SET plan_x = NULL, plan_y = NULL, plan_w = NULL, plan_h = NULL WHERE id = ?`, id);
     }

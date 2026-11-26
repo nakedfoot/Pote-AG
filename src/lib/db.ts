@@ -150,6 +150,8 @@ const MIGRATIONS: string[] = [
   `,
   // v11 : carré tourné de 90° sur le plan du jardin
   `ALTER TABLE carre ADD COLUMN plan_rot INTEGER NOT NULL DEFAULT 0;`,
+  // v12 : la rotation du carré sur le plan est un angle libre en degrés (0 ou 1 = 90° avant)
+  `UPDATE carre SET plan_rot = plan_rot * 90;`,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };

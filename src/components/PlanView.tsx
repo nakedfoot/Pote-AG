@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { savePlan, savePlanEchelle, supprimerPlan, uploadPlan } from "@/app/actions/plan";
 import AutoRefresh from "@/components/AutoRefresh";
+import CarreDessus from "@/components/CarreDessus";
 import { DEFAUT_CARRE_CM, formatDimensions } from "@/lib/carres";
 
 export type Rect = { x: number; y: number; w: number; h: number }; // fractions (0..1) de l'image
@@ -12,7 +13,7 @@ export type PlantInfo = { id: number; nom: string; variete: string | null; etat:
 export type ZoneItem = { id: number; nom: string; couleur: string; rect: Rect | null; etat: Etat2 };
 export type CarreItem = {
   id: number; zone_id: number; nom: string; rect: Rect | null; etat: Etat2; plants: PlantInfo[];
-  /** Dimensions réelles (cm) et rotation de 90° sur le plan */
+  /** Dimensions réelles (cm) et rotation sur le plan (degrés, sens horaire) */
   longueur: number | null; largeur: number | null; rot: number;
 };
 
@@ -55,15 +56,14 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
   const echelle = echelleCm ?? ECHELLE_DEFAUT_CM;
 
   /** Taille d'un carré sur le plan (fractions de l'image), à l'échelle : longueur réelle / largeur réelle de l'image. */
-  const tailleCarre = (c: CarreItem, rot = rots[c.id] ?? 0) => {
+  const tailleCarre = (c: CarreItem) => {
     const l = c.longueur ?? DEFAUT_CARRE_CM, w = c.largeur ?? DEFAUT_CARRE_CM;
-    const [a, b] = rot ? [w, l] : [l, w];
-    return { w: Math.min(1, a / echelle), h: Math.min(1, (b / echelle) * ratio) };
+    return { w: Math.min(1, l / echelle), h: Math.min(1, (w / echelle) * ratio) };
   };
   /** Rectangle d'un carré placé, ramené dans l'image. */
-  const rectCarre = (c: CarreItem, base: Rect | null | undefined, rot = rots[c.id] ?? 0): Rect | null => {
+  const rectCarre = (c: CarreItem, base: Rect | null | undefined): Rect | null => {
     if (!base) return null;
-    const t = tailleCarre(c, rot);
+    const t = tailleCarre(c);
     return { x: clamp(base.x, 0, 1 - t.w), y: clamp(base.y, 0, 1 - t.h), ...t };
   };
 
@@ -183,10 +183,23 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
   };
 
   const tourner = (c: CarreItem) => {
-    const rot = (rots[c.id] ?? 0) ? 0 : 1;
-    setRots((r) => ({ ...r, [c.id]: rot }));
-    const base = rects[`c${c.id}`];
-    if (base) setRect(`c${c.id}`, { ...base, ...tailleCarre(c, rot) });
+    setRots((r) => ({ ...r, [c.id]: ((r[c.id] ?? 0) + 90) % 360 }));
+    setDirty(true);
+    setFailed(false);
+    setMsg(null);
+  };
+
+  /** Rotation libre : la poignée suit le pointeur autour du centre du carré (pas de 5°). */
+  const tournerVers = (e: React.PointerEvent, c: CarreItem, r: Rect) => {
+    if (e.buttons === 0 || !box.current) return;
+    const b = box.current.getBoundingClientRect();
+    const cx = b.left + (r.x + r.w / 2) * b.width, cy = b.top + (r.y + r.h / 2) * b.height;
+    const deg = (Math.atan2(e.clientX - cx, cy - e.clientY) * 180) / Math.PI;
+    const rot = ((Math.round(deg / 5) * 5) % 360 + 360) % 360;
+    setRots((p) => (p[c.id] === rot ? p : { ...p, [c.id]: rot }));
+    setDirty(true);
+    setFailed(false);
+    setMsg(null);
   };
 
   const enregistrerEchelle = () => {
@@ -338,17 +351,36 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
             return (
               <div
                 key={key}
-                style={{ ...rectStyle(r), borderColor: col, backgroundColor: `${col}55`, boxShadow: "inset 0 0 0 2px rgba(120,80,40,0.55)", touchAction: edit ? "none" : "auto" }}
-                className={`absolute rounded-md border-2 ${selected === key ? "z-30 ring-2 ring-white" : "z-20"} ${edit && !arm ? "cursor-move" : "cursor-pointer"}`}
+                style={{ ...rectStyle(r), transform: `rotate(${rots[c.id] ?? 0}deg)`, touchAction: edit ? "none" : "auto" }}
+                className={`absolute ${selected === key ? "z-30" : "z-20"} ${edit && !arm ? "cursor-move" : "cursor-pointer"}`}
                 onPointerDown={(e) => startDrag(e, key, "move", r)}
                 onPointerMove={onDragMove}
                 onPointerUp={endDrag}
                 onClick={(e) => { e.stopPropagation(); setSelected(key); }}
                 title={`${c.nom} — ${formatDimensions(c.longueur, c.largeur, null) ?? "dimensions non renseignées"} — ${LIBELLE[c.etat]}`}
               >
-                <span className="pointer-events-none absolute inset-x-0.5 top-0.5 truncate rounded bg-black/55 px-1 text-center text-[11px] font-medium leading-4 text-white">
+                {/* Carré vu du dessus (cadre en bois et terre), contour coloré selon l'état des plants */}
+                <div className="pointer-events-none absolute inset-0 rounded-sm" style={{ boxShadow: `0 0 0 2px ${col}${selected === key ? "" : "cc"}, 0 0 0 4px ${selected === key ? "#fff" : "transparent"}` }}>
+                  <CarreDessus longueur={c.longueur} largeur={c.largeur} fill />
+                </div>
+                <span
+                  className="pointer-events-none absolute left-1/2 top-1/2 max-w-[90%] truncate rounded bg-black/60 px-1 text-center text-[11px] font-medium leading-4 text-white"
+                  style={{ transform: `translate(-50%, -50%) rotate(${-(rots[c.id] ?? 0)}deg)` }}
+                >
                   {c.nom}{c.plants.length > 0 && ` · ${c.plants.length}`}{arroser && " 💧"}{alerte > 0 && " ⚠️"}
                 </span>
+                {edit && selected === key && !arm && (
+                  <>
+                    <span className="pointer-events-none absolute -top-5 left-1/2 h-5 w-px bg-white/90" />
+                    <span
+                      title="Tourner"
+                      className="absolute -top-8 left-1/2 flex h-6 w-6 -translate-x-1/2 cursor-grab items-center justify-center rounded-full border-2 border-white bg-green-700 text-[11px] text-white shadow"
+                      style={{ touchAction: "none" }}
+                      onPointerDown={(e) => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); }}
+                      onPointerMove={(e) => tournerVers(e, c, r)}
+                    >↻</span>
+                  </>
+                )}
               </div>
             );
           })}
@@ -417,7 +449,7 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
                               <span className="block truncate text-xs text-muted">{formatDimensions(c.longueur, c.largeur, null) ?? "dimensions non renseignées"}</span>
                             </div>
                             <span className="flex shrink-0 gap-1">
-                              <button className="rounded border border-border px-2 text-xs hover:bg-black/5" onClick={() => tourner(c)} title="Tourner de 90°">↻</button>
+                              <button className="rounded border border-border px-2 text-xs hover:bg-black/5" onClick={() => tourner(c)} title="Tourner de 90° (ou glisser la poignée ↻ sur le plan)">↻</button>
                               {rects[`c${c.id}`] && (
                                 <button className="rounded border border-border px-2 text-xs hover:bg-black/5" onClick={() => { setRect(`c${c.id}`, null); setSelected(null); }} title="Retirer du plan">✕</button>
                               )}

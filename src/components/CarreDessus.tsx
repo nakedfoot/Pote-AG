@@ -11,9 +11,11 @@ const HAUTEUR_MAX_REM = 22; // un carré très profond ne dépasse pas cette hau
  * Le conteneur porte `data-carre-box` (cible de dépôt pour le glisser-déposer).
  */
 export default function CarreDessus({
-  carreId, longueur, largeur, children, className = "",
+  carreId, longueur, largeur, children, className = "", fill = false,
 }: {
   carreId?: number; longueur: number | null; largeur: number | null; children?: React.ReactNode; className?: string;
+  /** Occupe toute la largeur du parent (sans plafond de hauteur) */
+  fill?: boolean;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const L = longueur || DEFAUT_CM;
@@ -29,7 +31,7 @@ export default function CarreDessus({
     <div
       data-carre-box={carreId}
       className={`relative mx-auto select-none ${className}`}
-      style={{ aspectRatio: `${L} / ${Wd}`, width: `min(100%, calc(${(L / Wd) * HAUTEUR_MAX_REM}rem * var(--zoom, 1)))` }}
+      style={{ aspectRatio: `${L} / ${Wd}`, width: fill ? "100%" : `min(100%, calc(${(L / Wd) * HAUTEUR_MAX_REM}rem * var(--zoom, 1)))` }}
     >
       <svg viewBox={`0 0 ${vw} ${vh}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full drop-shadow-md" aria-hidden>
         <defs>
