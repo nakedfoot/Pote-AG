@@ -41,14 +41,17 @@ export default function CarreGraphic({
   const top = (u: number, v: number): Pt => [x0 + u + v * KX, yt - v * KY];
 
   // Épaisseur du cadre (≈ 3 cm), terre légèrement en contrebas
-  const t = Math.max(2, Math.min(4, 3 * s, L / 4, D / 4));
+  // t : épaisseur apparente du rebord ; en profondeur (v) elle est divisée par KY pour que
+  // les rebords avant/arrière paraissent aussi épais que ceux de gauche/droite.
+  const t = Math.max(2.5, Math.min(5, 3 * s, L / 4, (D * KY) / 3));
+  const tv = t / KY;
   const creux = h > 0 ? Math.min(Hh * 0.25, 7) : 0;
   const soil = (pts: Pt[]) => pts.map(([x, y]) => [x, y + creux] as Pt);
 
   const front: Pt[] = [[x0, yb], [x0 + L, yb], [x0 + L, yt], [x0, yt]];
   const side: Pt[] = [[x0 + L, yb], [x0 + L + dx, yb - dy], [x0 + L + dx, yt - dy], [x0 + L, yt]];
   const rim: Pt[] = [top(0, 0), top(L, 0), top(L, D), top(0, D)];
-  const inner: Pt[] = [top(t, t), top(L - t, t), top(L - t, D - t), top(t, D - t)];
+  const inner: Pt[] = [top(t, tv), top(L - t, tv), top(L - t, D - tv), top(t, D - tv)];
   const terre = soil(inner);
   const paroiFond: Pt[] = [inner[3], inner[2], terre[2], terre[3]]; // face intérieure de la planche du fond
   const paroiGauche: Pt[] = [inner[0], inner[3], terre[3], terre[0]];
@@ -98,6 +101,7 @@ export default function CarreGraphic({
         <radialGradient id={`sol${uid}`} cx="0.5" cy="0.5" r="0.5">
           <stop offset="0" stopColor="#6aa84f" stopOpacity="0.55" /><stop offset="1" stopColor="#6aa84f" stopOpacity="0" />
         </radialGradient>
+        <clipPath id={`ouv${uid}`}><polygon points={poly(inner)} /></clipPath>
         <clipPath id={`clipHerbe${uid}`}><rect x="0" y="0" width={W} height={H} /></clipPath>
       </defs>
 
@@ -134,6 +138,8 @@ export default function CarreGraphic({
       <polygon points={poly(rim)} fill="#fff" filter={f("grain")} />
       <polygon points={poly(rim)} fill="none" stroke="#4a2c12" strokeOpacity="0.6" strokeWidth={0.8} strokeLinejoin="round" />
       <polygon points={poly(inner)} fill="#2a1a0e" />
+      {/* Tout l'intérieur est rogné à l'ouverture : la terre, en contrebas, ne recouvre jamais les rebords avant et droit */}
+      <g clipPath={f("ouv")}>
       <polygon points={poly(terre)} fill="#fff" filter={f("terre")} />
       {/* Parois intérieures visibles */}
       {creux > 0 && (
@@ -145,6 +151,7 @@ export default function CarreGraphic({
       {/* Ombre des parois sur la terre */}
       <polygon points={poly(terre)} fill={`url(#ombreTerre${uid})`} />
       <polygon points={poly(terre)} fill="none" stroke="#1a0f06" strokeOpacity="0.5" strokeWidth={0.6} />
+      </g>
 
       {/* Cotes */}
       <text x={x0 + L / 2} y={yb + 14} textAnchor="middle" className={label}>{cm(longueur)}</text>
