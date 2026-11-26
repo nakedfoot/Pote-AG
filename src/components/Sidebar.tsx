@@ -7,8 +7,8 @@ import { useState } from "react";
 type Item = { href: string; label: string; icon: string; highlight?: boolean };
 
 const MAIN: Item[] = [
-  { href: "/", label: "Accueil", icon: "🏠" },
   { href: "/plants/new", label: "Nouveau plant", icon: "➕", highlight: true },
+  { href: "/", label: "Accueil", icon: "🏠" },
   { href: "/vue-potager", label: "Vue potager", icon: "🗺️" },
   { href: "/zones", label: "Zones", icon: "📍" },
   { href: "/carres", label: "Carrés", icon: "🟩" },
