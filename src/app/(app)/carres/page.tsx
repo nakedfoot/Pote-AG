@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { deleteCarre, saveCarre } from "@/app/actions/garden";
-import CarreGraphic, { type EtatPlant } from "@/components/CarreGraphic";
+import CarreGraphic from "@/components/CarreGraphic";
 import { formatDimensions, parseAncienneDimension, surfaceM2 } from "@/lib/carres";
-import { listCarres, listPlants, listZones, plantStatus } from "@/lib/queries";
+import { listCarres, listZones } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -16,15 +16,6 @@ export default async function CarresPage() {
         <p className="card text-sm">Commencez par <Link href="/zones" className="underline">créer une zone</Link>.</p>
       </div>
     );
-  }
-
-  const parCarre = new Map<number, { etat: EtatPlant }[]>();
-  for (const p of listPlants()) {
-    if (p.carre_id === null) continue;
-    const s = plantStatus(p);
-    const l = parCarre.get(p.carre_id) ?? [];
-    l.push({ etat: s.mesures.length ? s.pire : "inconnu" });
-    parCarre.set(p.carre_id, l);
   }
 
   return (
@@ -48,7 +39,6 @@ export default async function CarresPage() {
           const longueur = c.longueur_cm ?? ancien?.longueur ?? null;
           const largeur = c.largeur_cm ?? ancien?.largeur ?? null;
           const surface = surfaceM2(longueur, largeur);
-          const plants = parCarre.get(c.id) ?? [];
           return (
             <div key={c.id} className="card flex flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
@@ -58,7 +48,7 @@ export default async function CarresPage() {
                 </div>
                 <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-xs dark:bg-white/10">🌱 {c.nb_plants}</span>
               </div>
-              <CarreGraphic longueur={longueur} largeur={largeur} hauteur={c.hauteur_cm} plants={plants} />
+              <CarreGraphic longueur={longueur} largeur={largeur} hauteur={c.hauteur_cm} />
               <p className="text-xs text-muted">
                 {formatDimensions(longueur, largeur, c.hauteur_cm) ?? "Dimensions non renseignées"}
                 {surface !== null && ` · ${Number(surface.toFixed(2))} m²`}

@@ -1,25 +1,25 @@
-/** État d'un plant (couleur du point), aligné sur la vue potager. */
-export type EtatPlant = "ok" | "bas" | "haut" | "inconnu";
-const COULEUR: Record<EtatPlant, string> = { ok: "#16a34a", bas: "#f59e0b", haut: "#dc2626", inconnu: "#9ca3af" };
+import { useId } from "react";
 
 const W = 240, H = 160;
-const PAD = { l: 30, r: 34, t: 10, b: 20 };
+const PAD = { l: 30, r: 34, t: 10, b: 22 };
 const KX = 0.5, KY = 0.32; // inclinaison de la largeur (projection oblique)
-const MAX_POINTS = 48;
+const PLANCHE_CM = 15; // hauteur d'une planche, pour le dessin du bois
 
 const cm = (n: number) => `${Number(n.toFixed(1))} cm`;
+type Pt = [number, number];
+const poly = (pts: Pt[]) => pts.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
 
 /**
- * Représentation d'un carré potager en perspective : longueur (face avant), largeur (profondeur)
- * et hauteur du cadre, à l'échelle. Les plants s'affichent en points sur la terre.
+ * Carré potager en bois vu en perspective, à l'échelle : longueur (face avant), largeur (profondeur)
+ * et hauteur du cadre. Rendu réaliste en SVG pur (veinures du bois, terre, ombre portée, herbe).
  * Composant sans état, prévu pour être réutilisé (ex. vue potager).
  */
 export default function CarreGraphic({
-  longueur, largeur, hauteur, plants = [], className = "w-full",
+  longueur, largeur, hauteur, className = "w-full",
 }: {
-  longueur: number | null; largeur: number | null; hauteur: number | null;
-  plants?: { etat: EtatPlant }[]; className?: string;
+  longueur: number | null; largeur: number | null; hauteur: number | null; className?: string;
 }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   if (!longueur || !largeur) {
     return (
       <div className={`flex items-center justify-center rounded-lg bg-black/5 text-center text-xs text-muted dark:bg-white/5 ${className}`} style={{ aspectRatio: `${W} / ${H}` }}>
@@ -35,39 +35,120 @@ export default function CarreGraphic({
   const yb = PAD.t + (ah + ext.y * s) / 2; // bas de la face avant
   const L = longueur * s, D = largeur * s, Hh = h * s;
   const dx = D * KX, dy = D * KY;
-  const poly = (pts: [number, number][]) => pts.map((p) => p.join(",")).join(" ");
+  const yt = yb - Hh; // niveau du dessus du cadre
 
-  // Face avant, face droite, dessus (terre)
-  const front = poly([[x0, yb], [x0 + L, yb], [x0 + L, yb - Hh], [x0, yb - Hh]]);
-  const side = poly([[x0 + L, yb], [x0 + L + dx, yb - dy], [x0 + L + dx, yb - dy - Hh], [x0 + L, yb - Hh]]);
-  const top = poly([[x0, yb - Hh], [x0 + L, yb - Hh], [x0 + L + dx, yb - Hh - dy], [x0 + dx, yb - Hh - dy]]);
+  // Point sur le plan du dessus : u le long de la longueur, v en profondeur (en px)
+  const top = (u: number, v: number): Pt => [x0 + u + v * KX, yt - v * KY];
 
-  // Plants : grille régulière sur la face supérieure
-  const shown = plants.slice(0, MAX_POINTS);
-  const n = shown.length;
-  const cols = n ? Math.max(1, Math.ceil(Math.sqrt((n * longueur) / largeur))) : 1;
-  const rows = n ? Math.ceil(n / cols) : 1;
-  const r = Math.max(2, Math.min(7, 0.35 * Math.min(L / cols, dy / rows)));
-  const dots = shown
-    .map((p, i) => {
-      const u = ((i % cols) + 0.5) / cols;
-      const v = (Math.floor(i / cols) + 0.5) / rows;
-      return { u, v, x: x0 + u * L + v * dx, y: yb - Hh - v * dy, etat: p.etat };
-    })
-    .sort((a, b) => b.v - a.v); // le fond d'abord
+  // Épaisseur du cadre (≈ 3 cm), terre légèrement en contrebas
+  const t = Math.max(2, Math.min(4, 3 * s, L / 4, D / 4));
+  const creux = h > 0 ? Math.min(Hh * 0.25, 7) : 0;
+  const soil = (pts: Pt[]) => pts.map(([x, y]) => [x, y + creux] as Pt);
 
+  const front: Pt[] = [[x0, yb], [x0 + L, yb], [x0 + L, yt], [x0, yt]];
+  const side: Pt[] = [[x0 + L, yb], [x0 + L + dx, yb - dy], [x0 + L + dx, yt - dy], [x0 + L, yt]];
+  const rim: Pt[] = [top(0, 0), top(L, 0), top(L, D), top(0, D)];
+  const inner: Pt[] = [top(t, t), top(L - t, t), top(L - t, D - t), top(t, D - t)];
+  const terre = soil(inner);
+  const paroiFond: Pt[] = [inner[3], inner[2], terre[2], terre[3]]; // face intérieure de la planche du fond
+  const paroiGauche: Pt[] = [inner[0], inner[3], terre[3], terre[0]];
+
+  // Joints entre planches
+  const n = h > 0 ? Math.min(8, Math.max(1, Math.round(h / PLANCHE_CM))) : 0;
+  const joints = Array.from({ length: n - 1 }, (_, i) => (i + 1) / n);
+
+  const ombre: Pt[] = [[x0 + 4, yb + 2], [x0 + L + 4, yb + 2], [x0 + L + dx + 7, yb - dy + 3], [x0 + dx + 6, yb - dy + 3]];
+  const f = (name: string) => `url(#${name}${uid})`;
   const label = "fill-muted text-[10px]";
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className={className} role="img" aria-label={`Carré de ${cm(longueur)} sur ${cm(largeur)}${hauteur ? `, hauteur ${cm(hauteur)}` : ""}`}>
-      {h > 0 && <polygon points={front} fill="#b88a58" stroke="#6b4a28" strokeWidth={1} strokeLinejoin="round" />}
-      {h > 0 && <polygon points={side} fill="#9a6e3f" stroke="#6b4a28" strokeWidth={1} strokeLinejoin="round" />}
-      <polygon points={top} fill="#6b4a2f" stroke="#6b4a28" strokeWidth={1.5} strokeLinejoin="round" />
-      {dots.map((d, i) => (
-        <circle key={i} cx={d.x} cy={d.y} r={r} fill={COULEUR[d.etat]} stroke="#fff" strokeWidth={0.8} />
-      ))}
+      <defs>
+        {/* Veinures du bois : bruit étiré horizontalement */}
+        <filter id={`grain${uid}`} x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.55" numOctaves="3" seed="7" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.18  0 0 0 0 0.09  0 0 0 0 0.03  1.5 0 0 0 -0.4" result="c" />
+          <feComposite in="c" in2="SourceAlpha" operator="in" />
+        </filter>
+        {/* Terre : grain fin brun, opaque */}
+        <filter id={`terre${uid}`} x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="11" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0.5 0 0 0 0.04  0.34 0 0 0 0.025  0.21 0 0 0 0.012  0 0 0 0 1" result="c" />
+          <feComposite in="c" in2="SourceAlpha" operator="in" />
+        </filter>
+        {/* Herbe */}
+        <filter id={`herbe${uid}`} x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.7 0.5" numOctaves="2" seed="4" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0.3 0 0 0 0.06  0.55 0 0 0 0.2  0.2 0 0 0 0.04  0 0 0 0 1" result="c" />
+          <feComposite in="c" in2="SourceAlpha" operator="in" />
+        </filter>
+        <filter id={`flou${uid}`} x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.5" /></filter>
+        <linearGradient id={`bois${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#d9a566" /><stop offset="1" stopColor="#b97f45" />
+        </linearGradient>
+        <linearGradient id={`boisCote${uid}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#a8703a" /><stop offset="1" stopColor="#80522a" />
+        </linearGradient>
+        <linearGradient id={`dessus${uid}`} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#e6b97b" /><stop offset="1" stopColor="#c58d52" />
+        </linearGradient>
+        <linearGradient id={`ombreTerre${uid}`} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stopColor="#000" stopOpacity="0" /><stop offset="1" stopColor="#000" stopOpacity="0.45" />
+        </linearGradient>
+        <radialGradient id={`sol${uid}`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#6aa84f" stopOpacity="0.55" /><stop offset="1" stopColor="#6aa84f" stopOpacity="0" />
+        </radialGradient>
+        <clipPath id={`clipHerbe${uid}`}><rect x="0" y="0" width={W} height={H} /></clipPath>
+      </defs>
+
+      {/* Sol herbeux et ombre portée */}
+      <g clipPath={`url(#clipHerbe${uid})`}>
+        <ellipse cx={x0 + (L + dx) / 2} cy={yb - dy / 2 + 2} rx={Math.min(W / 2, (L + dx) / 2 + 28)} ry={Math.min(H / 2, dy / 2 + 22)} fill={`url(#sol${uid})`} />
+        <ellipse cx={x0 + (L + dx) / 2} cy={yb - dy / 2 + 2} rx={Math.min(W / 2, (L + dx) / 2 + 28)} ry={Math.min(H / 2, dy / 2 + 22)} fill="#fff" filter={f("herbe")} opacity="0.35" />
+      </g>
+      <polygon points={poly(ombre)} fill="#000" opacity="0.4" filter={f("flou")} />
+
+      {h > 0 && (
+        <>
+          {/* Face avant */}
+          <polygon points={poly(front)} fill={f("bois")} />
+          <polygon points={poly(front)} fill="#fff" filter={f("grain")} />
+          {joints.map((j, i) => (
+            <line key={i} x1={x0} x2={x0 + L} y1={yb - Hh * j} y2={yb - Hh * j} stroke="#4a2c12" strokeOpacity="0.75" strokeWidth={0.9} />
+          ))}
+          <line x1={x0} x2={x0 + L} y1={yt + 0.5} y2={yt + 0.5} stroke="#fff" strokeOpacity="0.35" strokeWidth={0.8} />
+          {/* Face droite, dans l'ombre */}
+          <polygon points={poly(side)} fill={f("boisCote")} />
+          <polygon points={poly(side)} fill="#fff" filter={f("grain")} />
+          {joints.map((j, i) => (
+            <line key={i} x1={x0 + L} x2={x0 + L + dx} y1={yb - Hh * j} y2={yb - dy - Hh * j} stroke="#3a210d" strokeOpacity="0.8" strokeWidth={0.9} />
+          ))}
+          <polygon points={poly(side)} fill="#000" opacity="0.08" />
+          <polygon points={poly(front)} fill="none" stroke="#4a2c12" strokeOpacity="0.6" strokeWidth={0.8} strokeLinejoin="round" />
+          <polygon points={poly(side)} fill="none" stroke="#3a210d" strokeOpacity="0.6" strokeWidth={0.8} strokeLinejoin="round" />
+        </>
+      )}
+
+      {/* Dessus : rebord en bois, puis terre en contrebas */}
+      <polygon points={poly(rim)} fill={f("dessus")} />
+      <polygon points={poly(rim)} fill="#fff" filter={f("grain")} />
+      <polygon points={poly(rim)} fill="none" stroke="#4a2c12" strokeOpacity="0.6" strokeWidth={0.8} strokeLinejoin="round" />
+      <polygon points={poly(inner)} fill="#2a1a0e" />
+      <polygon points={poly(terre)} fill="#fff" filter={f("terre")} />
+      {/* Parois intérieures visibles */}
+      {creux > 0 && (
+        <>
+          <polygon points={poly(paroiFond)} fill="#7a4d27" />
+          <polygon points={poly(paroiGauche)} fill="#8d5a2e" />
+        </>
+      )}
+      {/* Ombre des parois sur la terre */}
+      <polygon points={poly(terre)} fill={`url(#ombreTerre${uid})`} />
+      <polygon points={poly(terre)} fill="none" stroke="#1a0f06" strokeOpacity="0.5" strokeWidth={0.6} />
+
       {/* Cotes */}
-      <text x={x0 + L / 2} y={yb + 13} textAnchor="middle" className={label}>{cm(longueur)}</text>
-      <text x={x0 + L + dx + 4} y={yb - Hh - dy / 2 + 3} className={label}>{cm(largeur)}</text>
+      <text x={x0 + L / 2} y={yb + 14} textAnchor="middle" className={label}>{cm(longueur)}</text>
+      <text x={x0 + L + dx + 4} y={yt - dy / 2 + 3} className={label}>{cm(largeur)}</text>
       {h > 0 && <text x={x0 - 4} y={yb - Hh / 2 + 3} textAnchor="end" className={label}>{cm(h)}</text>}
     </svg>
   );
