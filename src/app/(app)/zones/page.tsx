@@ -56,7 +56,7 @@ export default async function ZonesPage() {
                   Aucun carré dans cette zone. <Link href="/carres" className="underline">Créer un carré</Link>.
                 </p>
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(min(11rem,100%),1fr))] gap-3">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(min(calc(11rem*var(--zoom,1.5)/1.5),100%),1fr))] gap-3">
                   {mine.map((c) => (
                     <Link key={c.id} href="/carres" className="flex flex-col gap-1 rounded-lg border border-border p-2 transition hover:shadow-md">
                       <CarreGraphic longueur={c.longueur_cm} largeur={c.largeur_cm} hauteur={c.hauteur_cm} pieds={c.pieds === 1} plants={plants.get(c.id)} />
