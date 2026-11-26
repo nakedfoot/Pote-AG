@@ -139,7 +139,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     <div className="space-y-6">
       <AutoRefresh seconds={30} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">🏠 Accueil</h1>
+        <h1 className="text-2xl font-semibold">🌱 Plants</h1>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(FILTRES) as Filtre[]).map((k) => (
             <Link

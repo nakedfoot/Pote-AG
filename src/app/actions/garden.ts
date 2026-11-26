@@ -246,5 +246,5 @@ export async function arroser(formData: FormData) {
   const plantId = Number(formData.get("plant_id"));
   run("INSERT INTO evenement (plant_id, type, date) VALUES (?, 'arrosage', ?)", plantId, new Date().toISOString().slice(0, 10));
   syncPlantNow(plantId);
-  revalidatePath("/");
+  revalidatePath("/", "layout"); // accueil « Plants » et page Synthèse
 }
