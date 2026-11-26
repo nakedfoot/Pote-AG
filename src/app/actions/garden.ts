@@ -9,6 +9,7 @@ import { removePlantNow, snapshotLive, syncAllNow, syncPlantNow } from "@/lib/mq
 import { copyUpload, deleteUpload, saveUpload } from "@/lib/image";
 import { FIELD_KEYS, formatMois, MOIS_COLS, NUMBER_FIELDS, parseMois, parseSourcesData } from "@/lib/botanique";
 import { METRIC_KEYS } from "@/lib/metrics";
+import { formatDimensions } from "@/lib/carres";
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const nul = (v: string) => (v === "" ? null : v);
@@ -44,10 +45,17 @@ export async function saveCarre(formData: FormData) {
   const zone = Number(formData.get("zone_id"));
   const nom = s(formData, "nom");
   if (!nom || !zone) redirect("/carres");
-  const dim = nul(s(formData, "dimensions"));
+  const pos = (k: string) => {
+    const v = num(formData, k);
+    return v !== null && v > 0 ? v : null;
+  };
+  const longueur = pos("longueur_cm");
+  const largeur = pos("largeur_cm");
+  const hauteur = pos("hauteur_cm");
+  const dim = formatDimensions(longueur, largeur, hauteur);
   const expo = nul(s(formData, "exposition"));
-  if (id) run("UPDATE carre SET zone_id = ?, nom = ?, dimensions = ?, exposition = ? WHERE id = ?", zone, nom, dim, expo, id);
-  else run("INSERT INTO carre (zone_id, nom, dimensions, exposition) VALUES (?, ?, ?, ?)", zone, nom, dim, expo);
+  if (id) run("UPDATE carre SET zone_id = ?, nom = ?, dimensions = ?, longueur_cm = ?, largeur_cm = ?, hauteur_cm = ?, exposition = ? WHERE id = ?", zone, nom, dim, longueur, largeur, hauteur, expo, id);
+  else run("INSERT INTO carre (zone_id, nom, dimensions, longueur_cm, largeur_cm, hauteur_cm, exposition) VALUES (?, ?, ?, ?, ?, ?, ?)", zone, nom, dim, longueur, largeur, hauteur, expo);
   syncAllNow().catch(() => {});
   redirect("/carres");
 }

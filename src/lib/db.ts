@@ -127,6 +127,12 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_plant_hauteur ON plant_hauteur(plant_id, date);
   `,
+  // v6 : dimensions précises des carrés (en cm), pour les représenter graphiquement
+  `
+  ALTER TABLE carre ADD COLUMN longueur_cm REAL;
+  ALTER TABLE carre ADD COLUMN largeur_cm REAL;
+  ALTER TABLE carre ADD COLUMN hauteur_cm REAL;
+  `,
 ];
 
 const g = globalThis as unknown as { __db?: DatabaseSync };
