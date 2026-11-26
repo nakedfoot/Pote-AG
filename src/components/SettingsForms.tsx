@@ -72,14 +72,14 @@ export function MqttForm({ v }: { v: MqttView }) {
     >
       <section className="card space-y-4">
         <h2 className="font-semibold">Serveur MQTT</h2>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2"><Field label="Adresse"><input name="host" defaultValue={v.host} placeholder="192.168.1.10" className="input" required /></Field></div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="sm:col-span-2"><Field label="Adresse"><input name="host" defaultValue={v.host} placeholder="192.168.1.10" className="input" required /></Field></div>
           <Field label="Port (facultatif)" hint="Vide = aucun port dans l'URL.">
             <input name="port" type="number" defaultValue={v.port ?? ""} placeholder="1883" className="input" />
           </Field>
         </div>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="tls" defaultChecked={v.tls} /> Connexion sécurisée (TLS)</label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Identifiant"><input name="username" defaultValue={v.username} autoComplete="off" className="input" /></Field>
           <Field label="Mot de passe" hint={v.hasPassword ? "Laisser vide pour conserver l'actuel." : undefined}>
             <input name="password" type="password" autoComplete="new-password" placeholder={v.hasPassword ? "••••••••" : ""} className="input" />
@@ -89,7 +89,7 @@ export function MqttForm({ v }: { v: MqttView }) {
 
       <section className="card space-y-4">
         <h2 className="font-semibold">Topics</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Topic de base Zigbee2MQTT" hint="Celui de Zigbee2MQTT (base_topic).">
             <input name="z2mBaseTopic" defaultValue={v.z2mBaseTopic} className="input" />
           </Field>
@@ -119,7 +119,7 @@ export function MqttForm({ v }: { v: MqttView }) {
             <option value="both">URL + base64</option>
           </select>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Taille max de la miniature base64 (Ko)"><input name="imageMaxKb" type="number" defaultValue={v.imageMaxKb} className="input" /></Field>
           <Field label="URL publique de l'application" hint="Sert à construire le lien de l'image.">
             <input name="publicUrl" defaultValue={v.publicUrl} placeholder="http://potager.local:3000" className="input" />
@@ -177,7 +177,7 @@ export function SourcesForm({ v }: { v: SourcesView }) {
 
   const champs: Record<ProviderId, React.ReactNode> = {
     openplantbook: (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Client ID" hint="Gratuit sur open.plantbook.io (API credentials).">
           <input name="clientId" defaultValue={v.opbClientId} autoComplete="off" className="input" />
         </Field>
@@ -218,7 +218,7 @@ export function SourcesForm({ v }: { v: SourcesView }) {
       {order.map((p, i) => (
         <section key={p} className="card space-y-3">
           <input type="hidden" name="order" value={p} />
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-green-700 text-sm font-semibold text-white">{i + 1}</span>
               <h2 className="font-semibold">{PROVIDERS[p]}</h2>

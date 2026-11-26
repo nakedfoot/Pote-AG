@@ -102,7 +102,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
         <div className="text-5xl">🌱</div>
         <h1 className="text-2xl font-semibold">Votre potager est vide</h1>
         <p className="text-sm text-muted">Créez une zone et un carré, puis ajoutez votre premier plant.</p>
-        <div className="flex justify-center gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <Link href="/zones" className="btn-secondary">📍 Créer une zone</Link>
           <Link href="/plants/new" className="btn">➕ Nouveau plant</Link>
         </div>
@@ -140,7 +140,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       <AutoRefresh seconds={30} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">🏠 Accueil</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(Object.keys(FILTRES) as Filtre[]).map((k) => (
             <Link
               key={k}
@@ -159,7 +159,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           <ul className="divide-y divide-border text-sm">
             {rappels.map((r, i) => (
               <li key={`${r.plant_id}-${r.type}-${i}`}>
-                <Link href={`/plants/${r.plant_id}`} className="flex items-center gap-2 py-1.5 hover:underline">
+                <Link href={`/plants/${r.plant_id}`} className="flex flex-wrap items-center gap-x-2 py-1.5 hover:underline">
                   <span>{rappelIcone(r.type)}</span>
                   <span className="font-medium">{r.nom}</span>
                   <span className="text-muted">· {r.message}</span>
@@ -187,7 +187,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
                   🟩 {carre} · {its.length} plant(s)
                   {alertes > 0 && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">{alertes} à surveiller</span>}
                 </h3>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-x-6 gap-y-12 pl-6 pt-8">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))] gap-x-6 gap-y-12 pl-6 pt-8">
                   {its.map(({ p, s }) => <Vignette key={p.id} p={p} s={s} />)}
                 </div>
               </div>

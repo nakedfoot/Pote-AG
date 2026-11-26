@@ -48,9 +48,9 @@ export default async function PlantPage({ params, searchParams }: PageProps<"/pl
   return (
     <div className="max-w-4xl space-y-6">
       {tab === "resume" && <AutoRefresh seconds={30} />}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {p.photo && <img src={p.photo} alt="" className="h-28 w-28 shrink-0 rounded-full border-4 border-card object-cover shadow-md" />}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          {p.photo && <img src={p.photo} alt="" className="h-20 w-20 shrink-0 rounded-full sm:h-28 sm:w-28 border-4 border-card object-cover shadow-md" />}
           <div>
             <h1 className="text-2xl font-semibold">🌱 {p.nom}{p.variete && <span className="font-normal text-muted"> · {p.variete}</span>}</h1>
             <p className="text-sm text-muted">
@@ -59,7 +59,7 @@ export default async function PlantPage({ params, searchParams }: PageProps<"/pl
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href={`/plants/${p.id}/edit`} className="btn-secondary">Modifier</Link>
           <form action={dupliquerPlant}>
             <input type="hidden" name="id" value={p.id} />
@@ -86,12 +86,12 @@ export default async function PlantPage({ params, searchParams }: PageProps<"/pl
         <button className="btn-secondary">Affecter</button>
       </form>
 
-      <nav className="flex gap-1 border-b border-border">
+      <nav className="flex gap-1 overflow-x-auto border-b border-border">
         {(Object.keys(TABS) as Tab[]).filter((t) => t !== "fiche" || opb).map((t) => (
           <Link
             key={t}
             href={href(t, t === "historique" ? range : undefined)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm ${tab === t ? "border-green-700 font-medium text-green-800 dark:text-green-300" : "border-transparent text-muted hover:text-foreground"}`}
+            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm sm:px-4 ${tab === t ? "border-green-700 font-medium text-green-800 dark:text-green-300" : "border-transparent text-muted hover:text-foreground"}`}
           >
             {TABS[t]}
           </Link>
@@ -104,18 +104,18 @@ export default async function PlantPage({ params, searchParams }: PageProps<"/pl
       {tab === "journal" && <Journal p={p} />}
       {tab === "fiche" && opb && (
         <section className="card space-y-4">
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
             <div><span className="text-muted">Identifiant : </span>{p.opb_pid}</div>
             {opb.category && <div><span className="text-muted">Catégorie : </span>{String(opb.category)}</div>}
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-muted"><th className="py-1 font-normal">Besoin</th><th className="font-normal">Min</th><th className="font-normal">Max</th></tr></thead>
             <tbody className="divide-y divide-border">
               {OPB_ROWS.map(([l, a, b, u]) => (
                 <tr key={a}><td className="py-2">{l}</td><td>{opb[a] ?? "—"} {u}</td><td>{opb[b] ?? "—"} {u}</td></tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <p className="text-xs text-muted">Source : OpenPlantbook. Ces valeurs ont servi à préremplir les seuils, modifiables via « Modifier ».</p>
         </section>
       )}
@@ -132,7 +132,7 @@ function Resume({ p, status }: { p: PlantFull; status: ReturnType<typeof plantSt
         {status.mesures.length === 0 ? (
           <p className="text-sm text-muted">Aucun capteur associé. <Link href={`/plants/${p.id}/edit`} className="underline">Associer des capteurs</Link></p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {status.mesures.map((m) => {
               const s = series.find((x) => x.metrique === m.metrique);
               return (
@@ -161,7 +161,7 @@ function Resume({ p, status }: { p: PlantFull; status: ReturnType<typeof plantSt
 
       <section className="card">
         <h2 className="mb-3 font-semibold">Dates</h2>
-        <dl className="grid grid-cols-4 gap-3 text-sm">
+        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <div><dt className="text-muted">Semis</dt><dd>{formatDate(p.date_semis)}</dd></div>
           <div><dt className="text-muted">Plantation</dt><dd>{formatDate(p.date_plantation)}</dd></div>
           <div><dt className="text-muted">Récolte prévue</dt><dd>{formatDate(p.date_recolte_prevue)}</dd></div>
@@ -171,7 +171,7 @@ function Resume({ p, status }: { p: PlantFull; status: ReturnType<typeof plantSt
 
       <section className="card">
         <h2 className="mb-3 font-semibold">Seuils souhaités</h2>
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
           {(Object.keys(METRICS) as (keyof typeof METRICS)[]).map((k) => (
             <div key={k} className="flex justify-between rounded-lg bg-black/5 px-3 py-2 dark:bg-white/5">
               <span>{METRICS[k].icone} {METRICS[k].label}</span>
@@ -222,7 +222,7 @@ function Botanique({ p }: { p: PlantFull }) {
         <h2 className="font-semibold">Caractéristiques</h2>
         {p.nom_scientifique && <p className="text-sm"><span className="text-muted">Nom scientifique : </span><em>{p.nom_scientifique}</em>{src("nom_scientifique")}</p>}
         {caracs.length > 0 && (
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             {caracs.map((k) => (
               <div key={k} className="flex justify-between gap-2 border-b border-border py-1">
                 <dt className="text-muted">{CARACS[k].label}</dt>
@@ -264,7 +264,7 @@ function Hauteur({ p }: { p: PlantFull }) {
         <form action={addHauteur} className="flex flex-wrap gap-2">
           <input type="hidden" name="plant_id" value={p.id} />
           <input type="date" name="date" defaultValue={new Date().toISOString().slice(0, 10)} className="input w-auto" />
-          <input name="hauteur_cm" type="number" step="any" min="0" required placeholder="Hauteur (cm)" className="input w-40" />
+          <input name="hauteur_cm" type="number" step="any" min="0" required placeholder="Hauteur (cm)" className="input w-full sm:w-40" />
           <input name="commentaire" placeholder="Commentaire (optionnel)" className="input min-w-48 flex-1" />
           <button className="btn">Ajouter</button>
         </form>
@@ -280,10 +280,10 @@ function Hauteur({ p }: { p: PlantFull }) {
         ) : (
           <ul className="divide-y divide-border text-sm">
             {hist.map((h) => (
-              <li key={h.id} className="flex items-center gap-3 py-2">
+              <li key={h.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
                 <span className="w-24 shrink-0 text-muted">{formatDate(h.date)}</span>
                 <span className="w-20 shrink-0 font-medium">{h.hauteur_cm} cm</span>
-                <span className="flex-1">{h.commentaire}</span>
+                <span className="min-w-0 flex-1 basis-32">{h.commentaire}</span>
                 <form action={deleteHauteur}>
                   <input type="hidden" name="id" value={h.id} />
                   <input type="hidden" name="plant_id" value={p.id} />
@@ -304,7 +304,7 @@ function Historique({ p, range, href }: { p: PlantFull; range: Range; href: (t: 
   const marks = plantMarks(p.id, from, to);
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(Object.keys(RANGES) as Range[]).map((r) => (
           <Link key={r} href={href("historique", r)} className={`rounded-full border px-3 py-1 text-sm ${range === r ? "border-green-700 bg-green-700 text-white" : "border-border bg-card hover:bg-black/5 dark:hover:bg-white/5"}`}>
             {RANGES[r]}
@@ -320,7 +320,7 @@ function Historique({ p, range, href }: { p: PlantFull; range: Range; href: (t: 
           const f = (n: number | null) => (n === null ? "—" : Number(n.toFixed(1)));
           return (
             <section key={s.metrique} className="card space-y-2">
-              <div className="flex items-baseline justify-between">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <h2 className="font-semibold">{METRICS[s.metrique].icone} {METRICS[s.metrique].label} <span className="text-sm font-normal text-muted">({METRICS[s.metrique].unite})</span></h2>
                 <span className="text-xs text-muted">min {f(vs.length ? Math.min(...vs) : null)} · moy {f(moy)} · max {f(vs.length ? Math.max(...vs) : null)}</span>
               </div>
@@ -355,10 +355,10 @@ function Journal({ p }: { p: PlantFull }) {
       ) : (
         <ul className="divide-y divide-border text-sm">
           {evts.map((e) => (
-            <li key={e.id} className="flex gap-3 py-2">
+            <li key={e.id} className="flex flex-wrap gap-x-3 gap-y-0.5 py-2">
               <span className="w-24 shrink-0 text-muted">{formatDate(e.date)}</span>
               <span className="w-28 shrink-0">{EVT[e.type] ?? e.type}</span>
-              <span>{e.commentaire}</span>
+              <span className="min-w-0 flex-1 basis-40">{e.commentaire}</span>
             </li>
           ))}
         </ul>

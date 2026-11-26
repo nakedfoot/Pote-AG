@@ -19,8 +19,8 @@ export default async function CarresPage() {
       {carres.length === 0 && <p className="card text-sm text-muted">Aucun carré pour l&apos;instant.</p>}
       <div className="space-y-2">
         {carres.map((c) => (
-          <div key={c.id} className="card flex items-center gap-3">
-            <form action={saveCarre} className="grid flex-1 grid-cols-4 gap-2">
+          <div key={c.id} className="card flex flex-wrap items-center gap-3">
+            <form action={saveCarre} className="grid min-w-0 flex-1 basis-64 gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <input type="hidden" name="id" value={c.id} />
               <select name="zone_id" defaultValue={c.zone_id} className="input">
                 {zones.map((z) => <option key={z.id} value={z.id}>{z.nom}</option>)}
@@ -40,15 +40,15 @@ export default async function CarresPage() {
           </div>
         ))}
       </div>
-      <form action={saveCarre} className="card grid grid-cols-4 gap-2">
-        <h2 className="col-span-4 font-semibold">Nouveau carré</h2>
+      <form action={saveCarre} className="card grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="font-semibold sm:col-span-2 lg:col-span-4">Nouveau carré</h2>
         <select name="zone_id" className="input">
           {zones.map((z) => <option key={z.id} value={z.id}>{z.nom}</option>)}
         </select>
         <input name="nom" placeholder="Nom (ex. A1)" required className="input" />
         <input name="dimensions" placeholder="Dimensions" className="input" />
         <input name="exposition" placeholder="Exposition" className="input" />
-        <button className="btn col-span-4">Ajouter</button>
+        <button className="btn sm:col-span-2 lg:col-span-4">Ajouter</button>
       </form>
     </div>
   );

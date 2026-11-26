@@ -12,11 +12,11 @@ export default async function ZonesPage() {
       )}
       <div className="space-y-2">
         {zones.map((z) => (
-          <div key={z.id} className="card flex items-center gap-3">
-            <form action={saveZone} className="flex flex-1 items-center gap-3">
+          <div key={z.id} className="card flex flex-wrap items-center gap-3">
+            <form action={saveZone} className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
               <input type="hidden" name="id" value={z.id} />
               <input type="color" name="couleur" defaultValue={z.couleur} className="h-9 w-12 rounded" />
-              <input name="nom" defaultValue={z.nom} className="input" />
+              <input name="nom" defaultValue={z.nom} className="input min-w-0 flex-1 basis-40" />
               <span className="shrink-0 text-xs text-muted">{carres.filter((c) => c.zone_id === z.id).length} carré(s)</span>
               <button className="btn-secondary">Renommer</button>
             </form>
@@ -27,9 +27,9 @@ export default async function ZonesPage() {
           </div>
         ))}
       </div>
-      <form action={saveZone} className="card flex items-center gap-3">
+      <form action={saveZone} className="card flex flex-wrap items-center gap-3">
         <input type="color" name="couleur" defaultValue="#16a34a" className="h-9 w-12 rounded" />
-        <input name="nom" placeholder="Nouvelle zone" required className="input" />
+        <input name="nom" placeholder="Nouvelle zone" required className="input min-w-0 flex-1 basis-40" />
         <button className="btn">Ajouter</button>
       </form>
     </div>

@@ -20,7 +20,7 @@ const SETTINGS: Item[] = [
   { href: "/settings/users", label: "Utilisateurs", icon: "👤" },
 ];
 
-function NavLink({ item, active }: { item: Item; active: boolean }) {
+function NavLink({ item, active, onNavigate }: { item: Item; active: boolean; onNavigate: () => void }) {
   const base = "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors";
   const cls = item.highlight
     ? `${base} bg-green-700 font-medium text-white hover:bg-green-800`
@@ -28,7 +28,7 @@ function NavLink({ item, active }: { item: Item; active: boolean }) {
       ? `${base} bg-green-600/15 font-medium text-green-800 dark:text-green-300`
       : `${base} hover:bg-black/5 dark:hover:bg-white/5`;
   return (
-    <Link href={item.href} className={cls}>
+    <Link href={item.href} className={cls} onClick={onNavigate}>
       <span aria-hidden>{item.icon}</span>
       <span>{item.label}</span>
     </Link>
@@ -37,16 +37,27 @@ function NavLink({ item, active }: { item: Item; active: boolean }) {
 
 export default function Sidebar({ user, logoutAction }: { user: { nom: string; role: string }; logoutAction: () => Promise<void> }) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false); // tiroir de navigation (mobile uniquement)
+  const close = () => setOpen(false);
   // Replié par défaut ; déplié d'office quand on est sur une page de paramètres, sauf choix contraire de l'utilisateur.
   const [manual, setManual] = useState<boolean | null>(null);
   const settingsOpen = manual ?? pathname.startsWith("/settings");
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   return (
-    <aside className="flex w-60 shrink-0 flex-col gap-1 border-r border-border bg-card p-3">
-      <div className="px-3 py-3 text-lg font-semibold">🌱 Potager</div>
+    <>
+    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-card px-4 py-2 md:hidden">
+      <span className="text-lg font-semibold">🌱 Potager</span>
+      <button type="button" onClick={() => setOpen(true)} aria-label="Ouvrir le menu" aria-expanded={open} className="rounded-lg px-3 py-1.5 text-xl hover:bg-black/5 dark:hover:bg-white/5">☰</button>
+    </header>
+    {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={close} aria-hidden />}
+    <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col gap-1 overflow-y-auto border-r border-border bg-card p-3 transition-transform md:static md:w-60 md:shrink-0 md:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <div className="flex items-center justify-between px-3 py-3 text-lg font-semibold">
+        <span>🌱 Potager</span>
+        <button type="button" onClick={close} aria-label="Fermer le menu" className="text-base md:hidden">✕</button>
+      </div>
       <nav className="flex flex-col gap-1">
         {MAIN.map((i) => (
-          <NavLink key={i.href} item={i} active={isActive(i.href)} />
+          <NavLink key={i.href} item={i} active={isActive(i.href)} onNavigate={close} />
         ))}
       </nav>
       <button
@@ -62,7 +73,7 @@ export default function Sidebar({ user, logoutAction }: { user: { nom: string; r
       {settingsOpen && (
         <nav id="menu-parametres" className="flex flex-col gap-1">
           {SETTINGS.map((i) => (
-            <NavLink key={i.href} item={i} active={isActive(i.href)} />
+            <NavLink key={i.href} item={i} active={isActive(i.href)} onNavigate={close} />
           ))}
         </nav>
       )}
@@ -71,5 +82,6 @@ export default function Sidebar({ user, logoutAction }: { user: { nom: string; r
         <button className="text-xs underline">Déconnexion</button>
       </form>
     </aside>
+    </>
   );
 }

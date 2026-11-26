@@ -151,7 +151,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
           Une photo aérienne, une capture de carte ou un dessin du jardin. Vous dessinerez ensuite vos zones et vos carrés dessus.
         </p>
         <form action={uploadPlan} className="flex flex-wrap items-center gap-3">
-          <input type="file" name="plan" accept="image/*" required className="text-sm" />
+          <input type="file" name="plan" accept="image/*" required className="max-w-full text-sm" />
           <button className="btn">Téléverser</button>
         </form>
       </div>
@@ -179,7 +179,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
         {failed && !pending && <button className="btn" onClick={enregistrer}>Réessayer</button>}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* ---- Plan ---- */}
         <div
           ref={box}
@@ -206,7 +206,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
                 <span className="pointer-events-none absolute left-1 top-0.5 rounded bg-black/55 px-1.5 text-[11px] font-medium text-white">{z.nom}</span>
                 {edit && selected === key && !arm && (
                   <span
-                    className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-nwse-resize rounded-full border-2 border-white bg-green-700"
+                    className="absolute -bottom-1.5 -right-1.5 h-5 w-5 cursor-nwse-resize rounded-full border-2 border-white bg-green-700"
                     style={{ touchAction: "none" }}
                     onPointerDown={(e) => startDrag(e, key, "resize")}
                   />
@@ -238,7 +238,7 @@ export default function PlanView({ version, zones, carres }: { version: number |
                 </span>
                 {edit && selected === key && !arm && (
                   <span
-                    className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-nwse-resize rounded-full border-2 border-white bg-green-700"
+                    className="absolute -bottom-2 -right-2 h-5 w-5 cursor-nwse-resize rounded-full border-2 border-white bg-green-700"
                     style={{ touchAction: "none" }}
                     onPointerDown={(e) => startDrag(e, key, "resize")}
                   />

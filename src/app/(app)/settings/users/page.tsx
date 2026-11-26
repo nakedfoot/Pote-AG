@@ -17,8 +17,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/settings/u
       {err && <p className="rounded-lg bg-red-100 p-2 text-sm text-red-700">{err}</p>}
       <div className="card divide-y divide-border">
         {listUsers().map((u) => (
-          <div key={u.id} className="flex items-center justify-between py-2">
-            <div>
+          <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+            <div className="min-w-0 break-words">
               <div className="font-medium">{u.nom} {u.id === me.id && <span className="text-xs text-muted">(vous)</span>}</div>
               <div className="text-sm text-muted">{u.email} · {u.role === "admin" ? "administrateur" : "utilisateur"}</div>
             </div>
@@ -31,8 +31,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/settings/u
           </div>
         ))}
       </div>
-      <form action={addUser} className="card grid grid-cols-2 gap-3">
-        <h2 className="col-span-2 font-semibold">Ajouter un utilisateur</h2>
+      <form action={addUser} className="card grid gap-3 sm:grid-cols-2">
+        <h2 className="font-semibold sm:col-span-2">Ajouter un utilisateur</h2>
         <input name="nom" placeholder="Nom" className="input" />
         <input name="email" type="email" placeholder="Email" required className="input" />
         <input name="password" type="password" placeholder="Mot de passe (8 min.)" minLength={8} required className="input" />
@@ -40,7 +40,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/settings/u
           <option value="user">Utilisateur</option>
           <option value="admin">Administrateur</option>
         </select>
-        <button className="btn col-span-2">Ajouter</button>
+        <button className="btn sm:col-span-2">Ajouter</button>
       </form>
     </div>
   );

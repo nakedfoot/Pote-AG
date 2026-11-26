@@ -181,7 +181,7 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
                 )}
               </span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button type="button" onClick={completer} disabled={busy} className="btn-secondary text-xs">
                 {busy ? "Interrogation…" : "Compléter depuis les sources"}
               </button>
@@ -192,9 +192,9 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
           <PlantSearch onPick={choisir} busy={busy} />
         )}
         {info && <p className={`rounded-lg p-2 text-xs ${info.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{info.text}</p>}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           {shownPhoto ? <img src={shownPhoto} alt="" className="h-20 w-20 rounded-xl object-cover" /> : <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-black/5 text-3xl dark:bg-white/5">🌱</div>}
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <label className="label">Photo <span className="font-normal text-muted">(optionnelle, envoyée dans le message MQTT)</span></label>
             <input
               ref={fileRef}
@@ -206,7 +206,7 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
                 const f = e.target.files?.[0];
                 setPreview(f ? URL.createObjectURL(f) : null);
               }}
-              className="text-sm"
+              className="max-w-full text-sm"
             />
             {shownPhoto && (
               <button
@@ -223,12 +223,12 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
             )}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div><label className="label">Nom *</label><input name="nom" value={nom} onChange={(e) => setNom(e.target.value)} required className="input" placeholder="Tomate" /></div>
           <div><label className="label">Variété</label><input name="variete" value={variete} onChange={(e) => setVariete(e.target.value)} className="input" placeholder="Cœur de bœuf" /></div>
         </div>
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1 basis-56">
             <label className="label">
               Nom scientifique{srcLabel("nom_scientifique") && <span className="font-normal text-muted"> · {srcLabel("nom_scientifique")}</span>}
             </label>
@@ -255,12 +255,12 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
             ))}
           </select>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           <div><label className="label">Date de semis</label><input type="date" name="date_semis" defaultValue={d(plant?.date_semis)} className="input" /></div>
           <div><label className="label">Date de plantation</label><input type="date" name="date_plantation" defaultValue={plant ? d(plant.date_plantation) : today} className="input" /></div>
           <div><label className="label">Récolte prévue</label><input type="date" name="date_recolte_prevue" defaultValue={d(plant?.date_recolte_prevue)} className="input" /></div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label">Stade</label>
             <select name="statut" defaultValue={plant?.statut ?? "croissance"} className="input">
@@ -283,9 +283,9 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
 
       <section className="card space-y-4">
         <h2 className="font-semibold">4. Caractéristiques <span className="text-xs font-normal text-muted">(optionnelles)</span></h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {CARAC_KEYS.map((k) => (
-            <div key={k} className={CARACS[k].type === "textarea" ? "col-span-2" : ""}>
+            <div key={k} className={CARACS[k].type === "textarea" ? "sm:col-span-2" : ""}>
               <label className="label">
                 {CARACS[k].label}{srcLabel(k) && <span className="font-normal text-muted"> · {srcLabel(k)}</span>}
               </label>
@@ -301,15 +301,15 @@ export default function PlantForm({ plant, zones, carres, hasSources, assoc, hau
 
       <section className="card space-y-4">
         <h2 className="font-semibold">5. Seuils souhaités <span className="text-xs font-normal text-muted">(optionnels, servent aux alertes)</span></h2>
-        <div className="grid grid-cols-[1fr_6rem_6rem_6rem] items-center gap-2 text-sm">
-          <span /><span className="text-xs text-muted">Min</span><span className="text-xs text-muted">Max</span><span />
+        <div className="grid grid-cols-[1fr_4.5rem_4.5rem] items-center gap-2 text-sm sm:grid-cols-[1fr_6rem_6rem_6rem]">
+          <span /><span className="text-xs text-muted">Min</span><span className="text-xs text-muted">Max</span><span className="hidden sm:block" />
           {METRIC_KEYS.map((k) => (
             <div key={k} className="contents">
               <span>{METRICS[k].icone} {METRICS[k].label} ({METRICS[k].unite})</span>
               {[METRICS[k].min, METRICS[k].max].map((col) => (
                 <input key={col} name={col} type="number" step="any" value={vals[col]} onChange={(e) => setVal(col, e.target.value)} className="input" />
               ))}
-              <span className="truncate text-xs text-muted">{srcLabel(METRICS[k].min) ?? srcLabel(METRICS[k].max) ?? ""}</span>
+              <span className="hidden truncate text-xs text-muted sm:block">{srcLabel(METRICS[k].min) ?? srcLabel(METRICS[k].max) ?? ""}</span>
             </div>
           ))}
         </div>
@@ -471,9 +471,9 @@ function CapteursPicker({ assoc }: { assoc: Partial<Record<MetricKey, string>> }
       {status?.connected && capteurs.length === 0 && <p className="text-xs text-muted">Aucun capteur détecté pour l&apos;instant.</p>}
       <div className="space-y-3">
         {METRIC_KEYS.map((k) => (
-          <div key={k} className="grid grid-cols-[11rem_1fr_auto] items-center gap-2 text-sm">
-            <span>{METRICS[k].icone} {METRICS[k].label}</span>
-            <div>
+          <div key={k} className="grid grid-cols-[1fr_auto] items-center gap-2 text-sm sm:grid-cols-[11rem_1fr_auto]">
+            <span className="col-span-2 sm:col-span-1">{METRICS[k].icone} {METRICS[k].label}</span>
+            <div className="min-w-0">
               <select name={`capteur_${k}`} value={sel[k] ?? ""} onChange={(e) => setSel({ ...sel, [k]: e.target.value })} className="input">
                 {options(k)}
               </select>
