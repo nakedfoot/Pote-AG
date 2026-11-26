@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { savePlan, savePlanEchelle, supprimerPlan, uploadPlan } from "@/app/actions/plan";
 import AutoRefresh from "@/components/AutoRefresh";
 import CarreDessus from "@/components/CarreDessus";
+import Zoomable from "@/components/Zoomable";
 import { DEFAUT_CARRE_CM, formatDimensions } from "@/lib/carres";
 
 export type Rect = { x: number; y: number; w: number; h: number }; // fractions (0..1) de l'image
@@ -297,7 +298,8 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        {/* ---- Plan ---- */}
+        {/* ---- Plan (zoomable : le plan reste en place dans la grille, sa hauteur ne dépend pas de celle du panneau) ---- */}
+        <Zoomable wide className="">
         <div
           ref={box}
           className="relative select-none overflow-hidden rounded-xl border border-border"
@@ -397,6 +399,7 @@ export default function PlanView({ version, zones, carres, echelleCm }: { versio
             />
           )}
         </div>
+        </Zoomable>
 
         {/* ---- Panneau latéral ---- */}
         <aside data-drop-liste className="card space-y-3 self-start text-sm">

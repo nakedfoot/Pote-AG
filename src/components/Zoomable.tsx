@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
  * (ou Échap, ou un clic à côté) la remet à sa place. Sa place reste réservée dans la grille pendant le zoom.
  * Pendant le zoom, la variable CSS `--zoom` vaut 1.6 (les dessins à taille plafonnée peuvent s'en servir).
  */
-export default function Zoomable({ children, className = "", style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
+export default function Zoomable({ children, className = "", style, wide = false }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; wide?: boolean }) {
   const [zoom, setZoom] = useState(false);
   const [h, setH] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
@@ -30,7 +30,7 @@ export default function Zoomable({ children, className = "", style }: { children
       <div
         ref={ref}
         style={{ ...style, ...(zoom ? ({ "--zoom": 1.6 } as React.CSSProperties) : {}) }}
-        className={`${className} ${zoom ? "fixed left-1/2 top-1/2 z-50 max-h-[94vh] w-[min(96vw,64rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto shadow-2xl" : "relative h-full"}`}
+        className={`${className} ${zoom ? `fixed left-1/2 top-1/2 z-50 max-h-[94vh] ${wide ? "w-[96vw]" : "w-[min(96vw,64rem)]"} -translate-x-1/2 -translate-y-1/2 overflow-y-auto shadow-2xl` : "relative h-full"}`}
       >
         <button
           type="button"
